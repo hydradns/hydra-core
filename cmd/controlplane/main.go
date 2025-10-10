@@ -2,9 +2,19 @@
 package main
 
 import (
-	"fmt"
+	"controlplane/routes"
+	"controlplane/middlewares"
+	"controlplane/config"
+	"github.com/gin-gonic/gin"
 )
 
-func main() {
-	fmt.Println("Controlplane command is running")
+func main(){
+	r:= gin.Default()
+
+	//Using middleware for example... Logger
+	r.Use(middlewares.Logger())
+
+	routes.RegisterRoutes(r)
+
+	r.Run(config.GetPort())
 }
