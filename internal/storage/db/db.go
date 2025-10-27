@@ -46,5 +46,8 @@ func migrate(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&models.Policy{},
 		&models.DNSQuery{},
+		&models.DomainPolicy{},
+		&models.Action{},
+		&models.Category{},
 	)
 }
