@@ -16,8 +16,8 @@ RUN go build -o dataplane ./cmd/dataplane
 FROM alpine:latest
 WORKDIR /app
 
-# Add CA certs (needed if you ever do HTTPS requests inside container)
-RUN apk add --no-cache ca-certificates
+# # Add CA certs (needed if you ever do HTTPS requests inside container)
+# RUN apk add --no-cache ca-certificates
 
 # Create non-root user & group
 RUN addgroup -g 1000 appgroup && \
