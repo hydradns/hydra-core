@@ -36,7 +36,6 @@ func (e *Engine) Shutdown() {
 	}
 }
 
-// todo: add logging of queries to the database, even if they failed
 // ProcessDNSQuery processes the DNS query and returns a response
 func (e *Engine) ProcessDNSQuery(w dns.ResponseWriter, r *dns.Msg) {
 	if r == nil || len(r.Question) == 0 {
@@ -59,13 +58,12 @@ func (e *Engine) ProcessDNSQuery(w dns.ResponseWriter, r *dns.Msg) {
 		if err := w.WriteMsg(m); err != nil {
 			logger.Log.Error("Failed to write DNS block response: " + err.Error())
 		}
-		// Store the blocked query in the log (CE = anonymized client IP)
+		// Store the blocked query in the log
 		if e.repos != nil && e.repos.QueryLogs != nil {
 			go func() {
 				dnslog := &models.DNSQuery{
-					ID:       uint(r.Id),
 					Domain:   domainName,
-					ClientIP: utils.AnonymizeIP(w.RemoteAddr().String()), // Consider anonymizing this if needed
+					ClientIP: utils.AnonymizeIP(w.RemoteAddr().String()),
 					Action:   "block",
 				}
 				if err := e.repos.QueryLogs.Save(dnslog); err != nil {
@@ -75,6 +73,16 @@ func (e *Engine) ProcessDNSQuery(w dns.ResponseWriter, r *dns.Msg) {
 		} else {
 			logger.Log.Warn("Query logging is disabled: repos or QueryLogs is nil")
 		}
+
+		// ✅ Added: Increment "block" counter in statistics
+		if e.repos != nil && e.repos.Statistics != nil {
+			go func() {
+				if err := e.repos.Statistics.IncrementCounter("block"); err != nil {
+					logger.Log.Error("Failed to update statistics: " + err.Error())
+				}
+			}()
+		}
+
 		return
 	}
 
@@ -94,13 +102,13 @@ func (e *Engine) ProcessDNSQuery(w dns.ResponseWriter, r *dns.Msg) {
 		if err := w.WriteMsg(m); err != nil {
 			logger.Log.Error("Failed to write DNS redirect response: " + err.Error())
 		}
-		// Store the redirected query in the log (CE = anonymized client IP)
+		// Store the redirected query in the log
 		if e.repos != nil && e.repos.QueryLogs != nil {
 			go func() {
 				dnslog := &models.DNSQuery{
 					ID:       uint(r.Id),
 					Domain:   domainName,
-					ClientIP: utils.AnonymizeIP(w.RemoteAddr().String()), // Consider anonymizing this if needed
+					ClientIP: utils.AnonymizeIP(w.RemoteAddr().String()),
 					Action:   "redirect",
 				}
 				if err := e.repos.QueryLogs.Save(dnslog); err != nil {
@@ -110,6 +118,16 @@ func (e *Engine) ProcessDNSQuery(w dns.ResponseWriter, r *dns.Msg) {
 		} else {
 			logger.Log.Warn("Query logging is disabled: repos or QueryLogs is nil")
 		}
+
+		// ✅ Added: Increment "redirect" counter in statistics
+		if e.repos != nil && e.repos.Statistics != nil {
+			go func() {
+				if err := e.repos.Statistics.IncrementCounter("redirect"); err != nil {
+					logger.Log.Error("Failed to update statistics: " + err.Error())
+				}
+			}()
+		}
+
 		return
 	}
 
@@ -135,14 +153,14 @@ func (e *Engine) ProcessDNSQuery(w dns.ResponseWriter, r *dns.Msg) {
 		logger.Log.Error("Failed to write DNS response: " + err.Error())
 	}
 
-	// Store the query in the log (CE = anonymized client IP)
+	// Store the query in the log
 	if e.repos != nil && e.repos.QueryLogs != nil {
 		go func() {
 			dnslog := &models.DNSQuery{
 				ID:       uint(resp.Id),
 				Domain:   domainName,
-				ClientIP: utils.AnonymizeIP(w.RemoteAddr().String()), // Consider anonymizing this if needed
-				Action:   "allow",                                    // For now, we only allow queries
+				ClientIP: utils.AnonymizeIP(w.RemoteAddr().String()),
+				Action:   "allow",
 			}
 			if err := e.repos.QueryLogs.Save(dnslog); err != nil {
 				logger.Log.Error("Failed to log DNS query: " + err.Error())
@@ -150,5 +168,14 @@ func (e *Engine) ProcessDNSQuery(w dns.ResponseWriter, r *dns.Msg) {
 		}()
 	} else {
 		logger.Log.Warn("Query logging is disabled: repos or QueryLogs is nil")
+	}
+
+	// ✅ Added: Increment "allow" counter in statistics
+	if e.repos != nil && e.repos.Statistics != nil {
+		go func() {
+			if err := e.repos.Statistics.IncrementCounter("allow"); err != nil {
+				logger.Log.Error("Failed to update statistics: " + err.Error())
+			}
+		}()
 	}
 }
