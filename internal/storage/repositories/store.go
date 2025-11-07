@@ -7,8 +7,9 @@ import (
 )
 
 type Store struct {
-	QueryLogs QueryLogRepository
-	Blocklist BlocklistRepository
+	QueryLogs  QueryLogRepository
+	Blocklist  BlocklistRepository
+	Statistics StatisticsRepository
 	// Policies  PolicyRepository
 	// Stats     StatsRepository
 	// add more repos here...
@@ -21,6 +22,7 @@ func NewStore(db *gorm.DB) *Store {
 		&models.BlocklistSource{},
 		&models.BlocklistSnapshot{},
 		&models.BlocklistEntry{},
+		&models.Statistics{},
 		// &models.Policy{},
 		// &models.Statistic{},
 		// &models.BlockedDomain{},
@@ -28,8 +30,9 @@ func NewStore(db *gorm.DB) *Store {
 	)
 
 	return &Store{
-		QueryLogs: NewGormQueryLogRepo(db),
-		Blocklist: NewBlocklistRepo(db),
+		QueryLogs:  NewGormQueryLogRepo(db),
+		Blocklist:  NewBlocklistRepo(db),
+		Statistics: NewGormStatisticsRepo(db),
 		// Policies:  NewGormPolicyRepo(db),
 		// Stats:     NewGormStatsRepo(db),
 	}
