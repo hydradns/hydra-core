@@ -1,1 +1,5 @@
-go.sum
+# Binaries
+/bin/
+# Data
+/data/
+.commit_message.txt
