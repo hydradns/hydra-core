@@ -138,4 +138,13 @@ func (e *Engine) ProcessDNSQuery(w dns.ResponseWriter, r *dns.Msg) {
 	default: // policy.ActionAllow
 		e.forwardUpstream(w, r, domainName)
 	}
+
+	// ✅ Added: Increment "allow" counter in statistics
+	if e.repos != nil && e.repos.Statistics != nil {
+		go func() {
+			if err := e.repos.Statistics.IncrementCounter("allow"); err != nil {
+				logger.Log.Error("Failed to update statistics: " + err.Error())
+			}
+		}()
+	}
 }
