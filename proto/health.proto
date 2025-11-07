@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package phantomdns.health;
+
+option go_package = "github.com/yourusername/phantomdns/proto/healthpb";
+
+service HealthService {
+  rpc CheckHealth(HealthRequest) returns (HealthResponse);
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+  string status = 1;
+}

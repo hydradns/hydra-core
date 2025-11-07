@@ -12,24 +12,27 @@ services:
       - NET_BIND_SERVICE # allow binding to low ports
     networks:
       - phantom-net
+    environment:
+      - CONTROLPLANE_ADDR=phantom-controlplane:50051
     volumes:
       - ./data:/app/data
       - ./configs/config.yaml:/app/configs/config.yaml
       - ./configs/policies.json:/app/configs/policies.json
 
-  # controlplane:
-  #   build:
-  #     context: .
-  #     dockerfile: docker/controlplane.Dockerfile
-  #   container_name: phantom-controlplane
-  #   restart: unless-stopped
-  #   ports:
-  #     - "8087:8086"
-  #   networks:
-  #     - phantom-net
-  #   volumes:
-  #     - ./data:/app/data
-  #     - ./configs/config.yaml:/app/configs/config.yaml
+  controlplane:
+    build:
+      context: .
+      dockerfile: docker/controlplane.Dockerfile
+    container_name: phantom-controlplane
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+      - "50051:50051"
+    networks:
+      - phantom-net
+    volumes:
+      - ./data:/app/data
+      - ./configs/config.yaml:/app/configs/config.yaml
 
 networks:
   phantom-net:
