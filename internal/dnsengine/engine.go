@@ -11,10 +11,19 @@ import (
 	"github.com/miekg/dns"
 )
 
+type BlocklistChecker interface {
+	IsBlocked(domain string) (bool, error)
+}
+
 type Engine struct {
 	upstreamManager *UpstreamManager
 	repos           *repositories.Store
 	policyEngine    *policy.Engine
+	blocklist       BlocklistChecker
+}
+
+func (e *Engine) AttachBlocklistChecker(b BlocklistChecker) {
+	e.blocklist = b
 }
 
 func NewDNSEngine(cfg config.DataPlaneConfig, repos *repositories.Store, pE *policy.Engine) (*Engine, error) {
@@ -36,7 +45,60 @@ func (e *Engine) Shutdown() {
 	}
 }
 
-// todo: add logging of queries to the database, even if they failed
+func (e *Engine) respondBlocked(w dns.ResponseWriter, r *dns.Msg, domain, reason string) {
+	m := new(dns.Msg)
+	m.SetRcode(r, dns.RcodeRefused)
+	if err := w.WriteMsg(m); err != nil {
+		logger.Log.Error("Failed to write DNS block response: " + err.Error())
+	}
+	go e.logQuery(r.Id, domain, w.RemoteAddr().String(), "block ("+reason+")")
+}
+
+func (e *Engine) respondRedirect(w dns.ResponseWriter, r *dns.Msg, domain, ip string) {
+	m := new(dns.Msg)
+	m.SetReply(r)
+	rr, err := dns.NewRR(domain + " 60 IN A " + ip)
+	if err != nil {
+		logger.Log.Error("Failed to create redirect RR: " + err.Error())
+		m.SetRcode(r, dns.RcodeServerFailure)
+	}
+	m.Answer = append(m.Answer, rr)
+	if err := w.WriteMsg(m); err != nil {
+		logger.Log.Error("Failed to write DNS redirect response: " + err.Error())
+	}
+	go e.logQuery(r.Id, domain, w.RemoteAddr().String(), "redirect")
+}
+
+func (e *Engine) forwardUpstream(w dns.ResponseWriter, r *dns.Msg, domain string) {
+	resp, err := e.upstreamManager.Exchange(r, 5, 2)
+	if err != nil {
+		logger.Log.Error("Upstream query failed: " + err.Error())
+		m := new(dns.Msg)
+		m.SetRcode(r, dns.RcodeServerFailure)
+		_ = w.WriteMsg(m)
+		return
+	}
+	if err := w.WriteMsg(resp); err != nil {
+		logger.Log.Error("Failed to write DNS response: " + err.Error())
+	}
+	go e.logQuery(resp.Id, domain, w.RemoteAddr().String(), "allow")
+}
+
+func (e *Engine) logQuery(id uint16, domain, client, action string) {
+	if e.repos == nil || e.repos.QueryLogs == nil {
+		return
+	}
+	dnslog := &models.DNSQuery{
+		ID:       uint(id),
+		Domain:   domain,
+		ClientIP: utils.AnonymizeIP(client),
+		Action:   action,
+	}
+	if err := e.repos.QueryLogs.Save(dnslog); err != nil {
+		logger.Log.Error("Failed to log DNS query: " + err.Error())
+	}
+}
+
 // ProcessDNSQuery processes the DNS query and returns a response
 func (e *Engine) ProcessDNSQuery(w dns.ResponseWriter, r *dns.Msg) {
 	if r == nil || len(r.Question) == 0 {
@@ -46,109 +108,34 @@ func (e *Engine) ProcessDNSQuery(w dns.ResponseWriter, r *dns.Msg) {
 	domainName := r.Question[0].Name
 	logger.Log.Infof("Received DNS query for %s", domainName)
 
+	// --- Step 1: Check blocklist first ---
+	if e.blocklist != nil {
+		blocked, err := e.blocklist.IsBlocked(domainName)
+		if err != nil {
+			logger.Log.Error("Blocklist check failed: " + err.Error())
+		} else if blocked {
+			logger.Log.Infof("Blocked by blocklist: %s", domainName)
+			e.respondBlocked(w, r, domainName, "blocklist")
+			return
+		}
+	}
+
+	// --- Step 2: Evaluate policy ---
 	decision, err := e.policyEngine.Evaluate(domainName)
 	if err != nil {
 		logger.Log.Error("Failed to evaluate policy: " + err.Error())
 		return
 	}
 
-	if decision.Action == policy.ActionDeny {
-		logger.Log.Infof("Blocking DNS query for %s", domainName)
-		m := new(dns.Msg)
-		m.SetRcode(r, dns.RcodeRefused)
-		if err := w.WriteMsg(m); err != nil {
-			logger.Log.Error("Failed to write DNS block response: " + err.Error())
-		}
-		// Store the blocked query in the log (CE = anonymized client IP)
-		if e.repos != nil && e.repos.QueryLogs != nil {
-			go func() {
-				dnslog := &models.DNSQuery{
-					ID:       uint(r.Id),
-					Domain:   domainName,
-					ClientIP: utils.AnonymizeIP(w.RemoteAddr().String()), // Consider anonymizing this if needed
-					Action:   "block",
-				}
-				if err := e.repos.QueryLogs.Save(dnslog); err != nil {
-					logger.Log.Error("Failed to log blocked DNS query: " + err.Error())
-				}
-			}()
-		} else {
-			logger.Log.Warn("Query logging is disabled: repos or QueryLogs is nil")
-		}
-		return
-	}
+	switch decision.Action {
+	case policy.ActionDeny:
+		logger.Log.Infof("Blocking via policy %s", decision.PolicyID)
+		e.respondBlocked(w, r, domainName, decision.PolicyID)
 
-	logger.Log.Infof("Allowing DNS query for %s", domainName)
+	case policy.ActionRedirect:
+		e.respondRedirect(w, r, domainName, decision.RedirectIP)
 
-	// If redirect action, create a synthetic response
-	if decision.Action == policy.ActionRedirect && decision.RedirectIP != "" {
-		logger.Log.Infof("Redirecting DNS query for %s to %s", domainName, decision.RedirectIP)
-		m := new(dns.Msg)
-		m.SetReply(r)
-		rr, err := dns.NewRR(domainName + " 60 IN A " + decision.RedirectIP)
-		if err != nil {
-			logger.Log.Error("Failed to create redirect RR: " + err.Error())
-			m.SetRcode(r, dns.RcodeServerFailure)
-		}
-		m.Answer = append(m.Answer, rr)
-		if err := w.WriteMsg(m); err != nil {
-			logger.Log.Error("Failed to write DNS redirect response: " + err.Error())
-		}
-		// Store the redirected query in the log (CE = anonymized client IP)
-		if e.repos != nil && e.repos.QueryLogs != nil {
-			go func() {
-				dnslog := &models.DNSQuery{
-					ID:       uint(r.Id),
-					Domain:   domainName,
-					ClientIP: utils.AnonymizeIP(w.RemoteAddr().String()), // Consider anonymizing this if needed
-					Action:   "redirect",
-				}
-				if err := e.repos.QueryLogs.Save(dnslog); err != nil {
-					logger.Log.Error("Failed to log redirected DNS query: " + err.Error())
-				}
-			}()
-		} else {
-			logger.Log.Warn("Query logging is disabled: repos or QueryLogs is nil")
-		}
-		return
-	}
-
-	// Default: ALLOW action
-	const (
-		defaultQueryTimeout = 5 // seconds
-		maxRetries          = 2
-	)
-	logger.Log.Infof("Forwarding DNS query for %s to upstream", domainName)
-
-	// Forward the query to an upstream resolver
-	resp, err := e.upstreamManager.Exchange(r, defaultQueryTimeout, maxRetries)
-	if err != nil {
-		logger.Log.Error("Failed to get response from upstream: " + err.Error())
-		m := new(dns.Msg)
-		m.SetRcode(r, dns.RcodeServerFailure)
-		_ = w.WriteMsg(m)
-		return
-	}
-
-	// Send the response back to the client
-	if err := w.WriteMsg(resp); err != nil {
-		logger.Log.Error("Failed to write DNS response: " + err.Error())
-	}
-
-	// Store the query in the log (CE = anonymized client IP)
-	if e.repos != nil && e.repos.QueryLogs != nil {
-		go func() {
-			dnslog := &models.DNSQuery{
-				ID:       uint(resp.Id),
-				Domain:   domainName,
-				ClientIP: utils.AnonymizeIP(w.RemoteAddr().String()), // Consider anonymizing this if needed
-				Action:   "allow",                                    // For now, we only allow queries
-			}
-			if err := e.repos.QueryLogs.Save(dnslog); err != nil {
-				logger.Log.Error("Failed to log DNS query: " + err.Error())
-			}
-		}()
-	} else {
-		logger.Log.Warn("Query logging is disabled: repos or QueryLogs is nil")
+	default: // policy.ActionAllow
+		e.forwardUpstream(w, r, domainName)
 	}
 }
