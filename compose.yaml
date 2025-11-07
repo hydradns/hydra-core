@@ -20,6 +20,8 @@ services:
       - ./configs/policies.json:/app/configs/policies.json
 
   controlplane:
+    depends_on:
+      - dataplane
     build:
       context: .
       dockerfile: docker/controlplane.Dockerfile

@@ -2,20 +2,35 @@
 package main
 
 import (
+	"log"
+
 	"github.com/lopster568/phantomDNS/cmd/controlplane/config"
 	"github.com/lopster568/phantomDNS/cmd/controlplane/middlewares"
 	"github.com/lopster568/phantomDNS/cmd/controlplane/routes"
+	"github.com/lopster568/phantomDNS/internal/grpc/client"
+	"github.com/lopster568/phantomDNS/internal/logger"
 
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
+	// Initialize grpc client
+	c, err := client.New("dataplane:50051")
+	if err != nil {
+		log.Fatalf("failed to connect to dataplane: %v", err)
+	}
+	defer c.Close()
+
+	status, err := c.CheckHealth()
+	if err != nil {
+		log.Fatalf("health check failed: %v", err)
+	}
+
+	logger.Log.Infof("Dataplane Health: %s\n", status)
+
+	// Initialize Gin router
 	r := gin.Default()
-
-	//Using middleware for example... Logger
 	r.Use(middlewares.Logger())
-
 	routes.RegisterRoutes(r)
-
 	r.Run(config.GetPort())
 }

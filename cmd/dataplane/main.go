@@ -8,6 +8,7 @@ import (
 	"github.com/lopster568/phantomDNS/internal/blocklist"
 	"github.com/lopster568/phantomDNS/internal/config"
 	"github.com/lopster568/phantomDNS/internal/dnsengine"
+	"github.com/lopster568/phantomDNS/internal/grpc/server"
 	"github.com/lopster568/phantomDNS/internal/logger"
 	"github.com/lopster568/phantomDNS/internal/policy"
 	"github.com/lopster568/phantomDNS/internal/storage/db"
@@ -69,6 +70,14 @@ func main() {
 	engine, err := dnsengine.NewDNSEngine(config.DefaultConfig.DataPlane, repos, policyEngine)
 	if err != nil {
 		logger.Log.Fatal("Failed to create DNS engine: " + err.Error())
+	}
+
+	// 6. GRPC server for health checks and metrics can be added here
+	healthService := &server.HealthService{}
+	grpcSrv := server.New(50051, healthService)
+
+	if err := grpcSrv.Start(); err != nil {
+		logger.Log.Fatalf("gRPC server failed: %v", err)
 	}
 
 	// 4.1 Attach blocklist checker to DNS engine
