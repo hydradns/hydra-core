@@ -1,6 +1,6 @@
 # --- Builder stage ---
 # SPDX-License-Identifier: GPL-3.0-or-later
-FROM golang:1.23-alpine AS builder
+FROM golang:1.24-alpine AS builder
 WORKDIR /app
 
 # Install git for go modules

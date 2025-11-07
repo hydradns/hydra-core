@@ -21,26 +21,26 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type HealthRequest struct {
+type HealthCheckRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *HealthRequest) Reset() {
-	*x = HealthRequest{}
+func (x *HealthCheckRequest) Reset() {
+	*x = HealthCheckRequest{}
 	mi := &file_proto_health_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *HealthRequest) String() string {
+func (x *HealthCheckRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*HealthRequest) ProtoMessage() {}
+func (*HealthCheckRequest) ProtoMessage() {}
 
-func (x *HealthRequest) ProtoReflect() protoreflect.Message {
+func (x *HealthCheckRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_proto_health_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -52,32 +52,32 @@ func (x *HealthRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use HealthRequest.ProtoReflect.Descriptor instead.
-func (*HealthRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use HealthCheckRequest.ProtoReflect.Descriptor instead.
+func (*HealthCheckRequest) Descriptor() ([]byte, []int) {
 	return file_proto_health_proto_rawDescGZIP(), []int{0}
 }
 
-type HealthResponse struct {
+type HealthCheckResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *HealthResponse) Reset() {
-	*x = HealthResponse{}
+func (x *HealthCheckResponse) Reset() {
+	*x = HealthCheckResponse{}
 	mi := &file_proto_health_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *HealthResponse) String() string {
+func (x *HealthCheckResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*HealthResponse) ProtoMessage() {}
+func (*HealthCheckResponse) ProtoMessage() {}
 
-func (x *HealthResponse) ProtoReflect() protoreflect.Message {
+func (x *HealthCheckResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_proto_health_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -89,12 +89,12 @@ func (x *HealthResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use HealthResponse.ProtoReflect.Descriptor instead.
-func (*HealthResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use HealthCheckResponse.ProtoReflect.Descriptor instead.
+func (*HealthCheckResponse) Descriptor() ([]byte, []int) {
 	return file_proto_health_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *HealthResponse) GetStatus() string {
+func (x *HealthCheckResponse) GetStatus() string {
 	if x != nil {
 		return x.Status
 	}
@@ -105,12 +105,12 @@ var File_proto_health_proto protoreflect.FileDescriptor
 
 const file_proto_health_proto_rawDesc = "" +
 	"\n" +
-	"\x12proto/health.proto\x12\x11phantomdns.health\"\x0f\n" +
-	"\rHealthRequest\"(\n" +
-	"\x0eHealthResponse\x12\x16\n" +
-	"\x06status\x18\x01 \x01(\tR\x06status2c\n" +
-	"\rHealthService\x12R\n" +
-	"\vCheckHealth\x12 .phantomdns.health.HealthRequest\x1a!.phantomdns.health.HealthResponseB3Z1github.com/yourusername/phantomdns/proto/healthpbb\x06proto3"
+	"\x12proto/health.proto\x12\bhealthpb\"\x14\n" +
+	"\x12HealthCheckRequest\"-\n" +
+	"\x13HealthCheckResponse\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status2N\n" +
+	"\x06Health\x12D\n" +
+	"\x05Check\x12\x1c.healthpb.HealthCheckRequest\x1a\x1d.healthpb.HealthCheckResponseB\x19Z\x17proto/healthpb;healthpbb\x06proto3"
 
 var (
 	file_proto_health_proto_rawDescOnce sync.Once
@@ -126,12 +126,12 @@ func file_proto_health_proto_rawDescGZIP() []byte {
 
 var file_proto_health_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_proto_health_proto_goTypes = []any{
-	(*HealthRequest)(nil),  // 0: phantomdns.health.HealthRequest
-	(*HealthResponse)(nil), // 1: phantomdns.health.HealthResponse
+	(*HealthCheckRequest)(nil),  // 0: healthpb.HealthCheckRequest
+	(*HealthCheckResponse)(nil), // 1: healthpb.HealthCheckResponse
 }
 var file_proto_health_proto_depIdxs = []int32{
-	0, // 0: phantomdns.health.HealthService.CheckHealth:input_type -> phantomdns.health.HealthRequest
-	1, // 1: phantomdns.health.HealthService.CheckHealth:output_type -> phantomdns.health.HealthResponse
+	0, // 0: healthpb.Health.Check:input_type -> healthpb.HealthCheckRequest
+	1, // 1: healthpb.Health.Check:output_type -> healthpb.HealthCheckResponse
 	1, // [1:2] is the sub-list for method output_type
 	0, // [0:1] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
