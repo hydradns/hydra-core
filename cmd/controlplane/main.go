@@ -2,14 +2,15 @@
 package main
 
 import (
-	"controlplane/routes"
-	"controlplane/middlewares"
-	"controlplane/config"
+	"github.com/lopster568/phantomDNS/cmd/controlplane/config"
+	"github.com/lopster568/phantomDNS/cmd/controlplane/middlewares"
+	"github.com/lopster568/phantomDNS/cmd/controlplane/routes"
+
 	"github.com/gin-gonic/gin"
 )
 
-func main(){
-	r:= gin.Default()
+func main() {
+	r := gin.Default()
 
 	//Using middleware for example... Logger
 	r.Use(middlewares.Logger())
