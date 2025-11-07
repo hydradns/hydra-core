@@ -12,7 +12,7 @@ import (
 )
 
 type HTTPFetcher struct {
-	client *http.Client
+	client *http.Clien
 }
 
 func NewHTTPFetcher() *HTTPFetcher {

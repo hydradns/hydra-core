@@ -14,6 +14,18 @@
             "regexes": []
         },
         {
+            "id": "block-shopping",
+            "name": "Block Shopping",
+            "category": "shopping",
+            "action": "BLOCK",
+            "priority": 100,
+            "source": "local",
+            "domains": [
+                "apple.com"
+            ],
+            "regexes": []
+        },
+        {
             "id": "block-malware",
             "name": "Block Malware",
             "category": "security",
@@ -28,7 +40,7 @@
             ]
         },
         {
-            "id": "block-google",
+            "id": "block-google-for-testing",
             "name": "Block Google",
             "category": "advertising",
             "action": "BLOCK",
