@@ -126,7 +126,7 @@ func (p *UpstreamPool) Close() error {
 	p.closed = true
 
 	var firstErr error
-	if err := p.udp.Close(); firstErr == nil && err != nil {
+	if err := p.udp.Close(); err != nil {
 		firstErr = err
 	}
 	for i, conn := range p.conns {
