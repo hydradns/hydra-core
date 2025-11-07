@@ -1,0 +1,66 @@
+package fetcher
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"net/http"
+	"time"
+
+	"github.com/cenkalti/backoff/v4"
+	"github.com/lopster568/phantomDNS/internal/blocklist/parser"
+)
+
+type HTTPFetcher struct {
+	client *http.Client
+}
+
+func NewHTTPFetcher() *HTTPFetcher {
+	return &HTTPFetcher{
+		client: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+	}
+}
+
+// Fetch returns body bytes, etag string, and error.
+func (h *HTTPFetcher) Fetch(ctx context.Context, src parser.SourceConfig, knownETag string) ([]byte, string, error) {
+	var body []byte
+	var etag string
+
+	op := func() error {
+		req, _ := http.NewRequestWithContext(ctx, "GET", src.URL, nil)
+		if knownETag != "" {
+			req.Header.Set("If-None-Match", knownETag)
+		}
+		resp, err := h.client.Do(req)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode == http.StatusNotModified {
+			// nothing changed
+			etag = knownETag
+			body = nil
+			return nil
+		}
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("http status %d", resp.StatusCode)
+		}
+		b, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		etag = resp.Header.Get("ETag")
+		body = b
+		return nil
+	}
+
+	bo := backoff.NewExponentialBackOff()
+	bo.MaxElapsedTime = 2 * time.Minute
+	if err := backoff.Retry(op, bo); err != nil {
+		return nil, "", err
+	}
+	return body, etag, nil
+}
