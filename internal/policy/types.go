@@ -15,7 +15,7 @@ func (a Action) String() string {
 	case ActionAllow:
 		return "allow"
 	case ActionDeny:
-		return "deny"
+		return "block"
 	case ActionRedirect:
 		return "redirect"
 	default:
@@ -23,20 +23,20 @@ func (a Action) String() string {
 	}
 }
 
-// Policy represents a single policy rule.
 type Policy struct {
-	ID        string   `json:"id"`
-	Name      string   `json:"name"`
-	Category  string   `json:"category"`
-	Action    string   `json:"action"`      // "BLOCK", "ALLOW", "REDIRECT"
-	Redirect  string   `json:"redirect_ip"` // optional
-	Priority  int      `json:"priority"`
-	Source    string   `json:"source"`
-	Domains   []string `json:"domains"`
-	Regexes   []string `json:"regexes"`
-	Groups    []string `json:"groups"`
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID          string   `json:"id" gorm:"primaryKey;size:64"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Category    string   `json:"category"`
+	Redirect    string   `json:"redirect_ip"` // optional redirect IP
+	Source      string   `json:"source"`      // "local"|"external"|"system"
+	Enabled     bool     `json:"enabled"`
+	Priority    int      `json:"priority"`
+	Action      string   `json:"action"`           // BLOCK|ALLOW|LOG_ONLY|REDIRECT
+	Domains     []string `gorm:"-" json:"domains"` // stored in separate table or JSON
+	Regexes     []string `gorm:"-" json:"regexes"`
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 // Decision is the result of evaluating a query.

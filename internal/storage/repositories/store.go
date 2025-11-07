@@ -8,6 +8,7 @@ import (
 
 type Store struct {
 	QueryLogs  QueryLogRepository
+	Blocklist  BlocklistRepository
 	Statistics StatisticsRepository
 	// Policies  PolicyRepository
 	// Stats     StatsRepository
@@ -18,6 +19,9 @@ func NewStore(db *gorm.DB) *Store {
 	// Auto-migrate all models here (central place)
 	_ = db.AutoMigrate(
 		&models.DNSQuery{},
+		&models.BlocklistSource{},
+		&models.BlocklistSnapshot{},
+		&models.BlocklistEntry{},
 		&models.Statistics{},
 		// &models.Policy{},
 		// &models.Statistic{},
@@ -27,6 +31,7 @@ func NewStore(db *gorm.DB) *Store {
 
 	return &Store{
 		QueryLogs:  NewGormQueryLogRepo(db),
+		Blocklist:  NewBlocklistRepo(db),
 		Statistics: NewGormStatisticsRepo(db),
 		// Policies:  NewGormPolicyRepo(db),
 		// Stats:     NewGormStatsRepo(db),

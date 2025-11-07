@@ -1,3 +1,8 @@
+# Binaries
+/bin/
+# Data
+/data/
+.commit_message.txt
 go.sum
 data/phantomdns.db
 data/phantomdns.db-shm

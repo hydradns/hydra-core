@@ -40,7 +40,7 @@
             ]
         },
         {
-            "id": "block-google",
+            "id": "block-google-for-testing",
             "name": "Block Google",
             "category": "advertising",
             "action": "BLOCK",
