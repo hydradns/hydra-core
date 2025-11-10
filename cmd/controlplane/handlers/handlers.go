@@ -1,13 +1,13 @@
 package handlers
 
-import "github.com/lopster568/phantomDNS/internal/grpc/client"
-
+// APIHandler contains dependencies for API endpoints
 type APIHandler struct {
-	GRPCClient *client.Client
+	// TODO: Add dependencies as needed (gRPC client, database, etc.)
 }
 
-func NewAPIHandler(grpcClient *client.Client) *APIHandler {
+// NewAPIHandler creates a new API handler
+func NewAPIHandler() *APIHandler {
 	return &APIHandler{
-		GRPCClient: grpcClient,
+		// TODO: Initialize dependencies
 	}
 }
