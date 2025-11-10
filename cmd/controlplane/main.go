@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/lopster568/phantomDNS/cmd/controlplane/config"
+	"github.com/lopster568/phantomDNS/cmd/controlplane/handlers"
 	"github.com/lopster568/phantomDNS/cmd/controlplane/middlewares"
 	"github.com/lopster568/phantomDNS/cmd/controlplane/routes"
 	"github.com/lopster568/phantomDNS/internal/grpc/client"
@@ -28,9 +29,11 @@ func main() {
 
 	logger.Log.Infof("Dataplane Health: %s\n", status)
 
+	apiHandler := handlers.NewAPIHandler()
+
 	// Initialize Gin router
 	r := gin.Default()
 	r.Use(middlewares.Logger())
-	routes.RegisterRoutes(r)
+	routes.RegisterRoutes(r, apiHandler)
 	r.Run(config.GetPort())
 }

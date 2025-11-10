@@ -5,16 +5,10 @@ import (
 	"github.com/lopster568/phantomDNS/cmd/controlplane/handlers"
 )
 
-func RegisterRoutes(r *gin.Engine) {
-	r.GET("/health", handlers.HealthCheck)
-	r.GET("/", handlers.Root)
-	"github.com/lopster568/phantomDNS/cmd/controlplane/handlers"
-
-	"github.com/gin-gonic/gin"
-)
-
 func RegisterRoutes(r *gin.Engine, apiHandler *handlers.APIHandler) {
 	api := r.Group("/api/v1")
+	r.GET("/health", apiHandler.HealthCheck)
+	r.GET("/", apiHandler.Root)
 	{
 		// Dashboard endpoints
 		dashboard := api.Group("/dashboard")
