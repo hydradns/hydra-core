@@ -9,12 +9,13 @@ import (
 )
 
 func main(){
-	r:= gin.Default()
-
-	//Using middleware for example... Logger
+		// Initialize Gin router
+	r := gin.Default()
 	r.Use(middlewares.Logger())
 
-	routes.RegisterRoutes(r)
+	// Create the API handler with dependencies
+	apiHandler := handlers.NewAPIHandler(c)
 
+	routes.RegisterRoutes(r, apiHandler)
 	r.Run(config.GetPort())
 }

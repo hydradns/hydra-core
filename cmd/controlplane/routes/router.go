@@ -5,7 +5,10 @@ import(
 	"controlplane/handlers"
 )
 
-func RegisterRoutes(r *gin.Engine) {
-    r.GET("/health", handlers.HealthCheck)
-	r.GET("/", handlers.Root)
+func RegisterRoutes(r *gin.Engine, apiHandler *handlers.APIHandler) {
+	api := r.Group("/api/v1")
+	{
+		api.GET("/health", apiHandler.HealthCheck)
+		api.GET("/", apiHandler.Root)
+	}
 }
