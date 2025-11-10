@@ -2,19 +2,22 @@
 package main
 
 import (
-	"controlplane/routes"
-	"controlplane/middlewares"
-	"controlplane/config"
+	"github.com/lopster568/phantomDNS/cmd/controlplane/config"
+	"github.com/lopster568/phantomDNS/cmd/controlplane/handlers"
+	"github.com/lopster568/phantomDNS/cmd/controlplane/middlewares"
+	"github.com/lopster568/phantomDNS/cmd/controlplane/routes"
+
 	"github.com/gin-gonic/gin"
 )
 
-func main(){
-	r:= gin.Default()
-
-	//Using middleware for example... Logger
+func main() {
+	// Initialize Gin router
+	r := gin.Default()
 	r.Use(middlewares.Logger())
 
-	routes.RegisterRoutes(r)
+	// Create the API handler with dependencies
+	apiHandler := handlers.NewAPIHandler()
 
+	routes.RegisterRoutes(r, apiHandler)
 	r.Run(config.GetPort())
 }
