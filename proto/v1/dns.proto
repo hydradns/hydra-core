@@ -1,0 +1,222 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+syntax = "proto3";
+
+package phantomdns.dataplane.v1;
+
+option go_package = "github.com/lopster568/phantomDNS/internal/pb/dataplane/v1;datapv1";
+option java_multiple_files = true;
+option java_package = "com.phantomdns.dataplane.v1";
+option csharp_namespace = "PhantomDNS.DataPlane.V1";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+import "proto/v1/common.proto";
+
+// ============================================================================
+// DNS Service
+// ============================================================================
+
+service DNSService {
+  // Get all DNS records with pagination
+  rpc GetDNSRecords(GetDNSRecordsRequest) returns (GetDNSRecordsResponse);
+  
+  // Get a specific DNS record by ID
+  rpc GetDNSRecordByID(GetDNSRecordByIDRequest) returns (DNSRecord);
+  
+  // Create a new DNS record
+  rpc CreateDNSRecord(CreateDNSRecordRequest) returns (DNSRecord);
+  
+  // Update an existing DNS record
+  rpc UpdateDNSRecord(UpdateDNSRecordRequest) returns (DNSRecord);
+  
+  // Delete a DNS record
+  rpc DeleteDNSRecord(DeleteDNSRecordRequest) returns (google.protobuf.Empty);
+  
+  // Bulk create DNS records
+  rpc BulkCreateDNSRecords(BulkCreateDNSRecordsRequest) returns (BulkCreateDNSRecordsResponse);
+  
+  // Bulk delete DNS records
+  rpc BulkDeleteDNSRecords(BulkDeleteDNSRecordsRequest) returns (BulkDeleteDNSRecordsResponse);
+  
+  // Stream DNS records for real-time updates
+  rpc WatchDNSRecords(google.protobuf.Empty) returns (stream DNSRecordUpdate);
+  
+  // Validate DNS record before creation/update
+  rpc ValidateDNSRecord(ValidateDNSRecordRequest) returns (ValidateDNSRecordResponse);
+}
+
+// DNS record types enum
+enum DNSRecordType {
+  TYPE_UNKNOWN = 0;
+  A = 1;
+  AAAA = 2;
+  CNAME = 3;
+  MX = 4;
+  NS = 5;
+  PTR = 6;
+  SOA = 7;
+  SRV = 8;
+  TXT = 9;
+  SPF = 10;
+  CAA = 11;
+}
+
+// DNS record class enum
+enum DNSRecordClass {
+  CLASS_UNKNOWN = 0;
+  IN = 1;
+  CH = 2;
+  HS = 3;
+}
+
+// DNS record message
+message DNSRecord {
+  string id = 1;
+  string domain = 2;
+  DNSRecordType type = 3;
+  DNSRecordClass class = 4;
+  string value = 5;
+  uint32 ttl = 6;
+  
+  // Priority (for MX, SRV records)
+  uint32 priority = 7;
+  
+  // Weight (for SRV records)
+  uint32 weight = 8;
+  
+  // Port (for SRV records)
+  uint32 port = 9;
+  
+  // Metadata
+  map<string, string> labels = 10;
+  bool enabled = 11;
+  string description = 12;
+  
+  // Timestamps
+  google.protobuf.Timestamp created_at = 13;
+  google.protobuf.Timestamp updated_at = 14;
+  
+  // Created by/Updated by for audit
+  string created_by = 15;
+  string updated_by = 16;
+}
+
+// Request to get DNS records with pagination
+message GetDNSRecordsRequest {
+  PaginationRequest pagination = 1;
+  string domain_filter = 2;
+  DNSRecordType type_filter = 3;
+  bool enabled_only = 4;
+}
+
+// Response containing DNS records
+message GetDNSRecordsResponse {
+  repeated DNSRecord records = 1;
+  PaginationMetadata pagination = 2;
+}
+
+// Request to get a single DNS record by ID
+message GetDNSRecordByIDRequest {
+  string record_id = 1;
+}
+
+// Request to create a DNS record
+message CreateDNSRecordRequest {
+  string domain = 1;
+  DNSRecordType type = 2;
+  DNSRecordClass class = 3;
+  string value = 4;
+  uint32 ttl = 5;
+  uint32 priority = 6;
+  uint32 weight = 7;
+  uint32 port = 8;
+  map<string, string> labels = 9;
+  string description = 10;
+  string created_by = 11;
+}
+
+// Request to update a DNS record
+message UpdateDNSRecordRequest {
+  string record_id = 1;
+  string domain = 2;
+  DNSRecordType type = 3;
+  string value = 4;
+  uint32 ttl = 5;
+  uint32 priority = 6;
+  uint32 weight = 7;
+  uint32 port = 8;
+  map<string, string> labels = 9;
+  string description = 10;
+  bool enabled = 11;
+  string updated_by = 12;
+}
+
+// Request to delete a DNS record
+message DeleteDNSRecordRequest {
+  string record_id = 1;
+  string deleted_by = 2;
+}
+
+// Request to bulk create DNS records
+message BulkCreateDNSRecordsRequest {
+  repeated CreateDNSRecordRequest records = 1;
+}
+
+// Response for bulk create operation
+message BulkCreateDNSRecordsResponse {
+  repeated DNSRecord created_records = 1;
+  repeated BulkOperationError errors = 2;
+  int32 success_count = 3;
+  int32 failure_count = 4;
+}
+
+// Request to bulk delete DNS records
+message BulkDeleteDNSRecordsRequest {
+  repeated string record_ids = 1;
+  string deleted_by = 2;
+}
+
+// Response for bulk delete operation
+message BulkDeleteDNSRecordsResponse {
+  repeated string deleted_ids = 1;
+  repeated BulkOperationError errors = 2;
+  int32 success_count = 3;
+  int32 failure_count = 4;
+}
+
+// Error details for bulk operations
+message BulkOperationError {
+  string record_id = 1;
+  int32 index = 2;
+  string error_message = 3;
+  ErrorDetail details = 4;
+}
+
+// Watch stream update for DNS records
+message DNSRecordUpdate {
+  enum UpdateType {
+    UNKNOWN = 0;
+    CREATED = 1;
+    UPDATED = 2;
+    DELETED = 3;
+  }
+  UpdateType type = 1;
+  DNSRecord record = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  string triggered_by = 4;
+}
+
+// Request to validate a DNS record
+message ValidateDNSRecordRequest {
+  string domain = 1;
+  DNSRecordType type = 2;
+  string value = 3;
+  uint32 ttl = 4;
+}
+
+// Response for DNS record validation
+message ValidateDNSRecordResponse {
+  bool is_valid = 1;
+  repeated string validation_errors = 2;
+  repeated string warnings = 3;
+}

@@ -1,0 +1,298 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+syntax = "proto3";
+
+package phantomdns.dataplane.v1;
+
+option go_package = "github.com/lopster568/phantomDNS/internal/pb/dataplane/v1;datapv1";
+option java_multiple_files = true;
+option java_package = "com.phantomdns.dataplane.v1";
+option csharp_namespace = "PhantomDNS.DataPlane.V1";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/duration.proto";
+import "proto/v1/common.proto";
+
+// ============================================================================
+// Blocklist Service
+// ============================================================================
+
+service BlocklistService {
+  // Get all blocklists with pagination
+  rpc GetBlocklists(GetBlocklistsRequest) returns (GetBlocklistsResponse);
+  
+  // Get a specific blocklist by ID
+  rpc GetBlocklistByID(GetBlocklistByIDRequest) returns (Blocklist);
+  
+  // Create a new blocklist
+  rpc CreateBlocklist(CreateBlocklistRequest) returns (Blocklist);
+  
+  // Update a blocklist
+  rpc UpdateBlocklist(UpdateBlocklistRequest) returns (Blocklist);
+  
+  // Delete a blocklist
+  rpc DeleteBlocklist(DeleteBlocklistRequest) returns (google.protobuf.Empty);
+  
+  // Get blocklist entries with pagination
+  rpc GetBlocklistEntries(GetBlocklistEntriesRequest) returns (GetBlocklistEntriesResponse);
+  
+  // Add entry to blocklist
+  rpc AddBlocklistEntry(AddBlocklistEntryRequest) returns (BlocklistEntry);
+  
+  // Remove entry from blocklist
+  rpc RemoveBlocklistEntry(RemoveBlocklistEntryRequest) returns (google.protobuf.Empty);
+  
+  // Bulk add entries
+  rpc BulkAddEntries(BulkAddEntriesRequest) returns (BulkAddEntriesResponse);
+  
+  // Refresh/sync blocklist from source
+  rpc RefreshBlocklist(RefreshBlocklistRequest) returns (RefreshBlocklistResponse);
+  
+  // Stream blocklist updates
+  rpc WatchBlocklists(google.protobuf.Empty) returns (stream BlocklistUpdate);
+  
+  // Get blocklist statistics
+  rpc GetBlocklistStats(google.protobuf.Empty) returns (BlocklistStats);
+}
+
+// Entry type for blocklist
+enum BlocklistEntryType {
+  TYPE_UNKNOWN = 0;
+  DOMAIN = 1;
+  SUBDOMAIN_WILDCARD = 2;
+  IP_ADDRESS = 3;
+  IP_RANGE = 4;
+  REGEX = 5;
+}
+
+// Blocklist category/tag
+enum BlocklistCategory {
+  CATEGORY_UNKNOWN = 0;
+  MALWARE = 1;
+  PHISHING = 2;
+  TRACKING = 3;
+  ADULT = 4;
+  GAMBLING = 5;
+  SCAM = 6;
+  SOCIAL_MEDIA = 7;
+  VIDEO_STREAMING = 8;
+  CUSTOM = 9;
+}
+
+// Source type for blocklist
+enum SourceType {
+  SOURCE_UNKNOWN = 0;
+  URL = 1;
+  FILE_UPLOAD = 2;
+  MANUAL_ENTRY = 3;
+  API = 4;
+}
+
+// Blocklist source configuration
+message BlocklistSource {
+  string id = 1;
+  SourceType type = 2;
+  string uri = 3; // URL or file path
+  google.protobuf.Duration refresh_interval = 4;
+  bool enabled = 5;
+  google.protobuf.Timestamp last_fetched = 6;
+  string last_fetch_status = 7;
+}
+
+// Blocklist entry
+message BlocklistEntry {
+  string id = 1;
+  string blocklist_id = 2;
+  BlocklistEntryType type = 3;
+  string value = 4;
+  BlocklistCategory category = 5;
+  
+  // Optional metadata
+  map<string, string> metadata = 6;
+  bool enabled = 7;
+  
+  // Timestamps
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+  
+  // Audit info
+  string created_by = 10;
+  string updated_by = 11;
+}
+
+// Blocklist definition
+message Blocklist {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  
+  // Categories this blocklist covers
+  repeated BlocklistCategory categories = 4;
+  
+  // Sources for this blocklist
+  repeated BlocklistSource sources = 5;
+  
+  // Enable/disable
+  bool enabled = 6;
+  
+  // Number of entries
+  int64 entry_count = 7;
+  
+  // Update timestamps
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+  google.protobuf.Timestamp last_synced = 10;
+  
+  // Audit info
+  string created_by = 11;
+  string updated_by = 12;
+  
+  // Metadata and labels
+  map<string, string> labels = 13;
+}
+
+// Request to get blocklists
+message GetBlocklistsRequest {
+  PaginationRequest pagination = 1;
+  bool enabled_only = 2;
+  repeated BlocklistCategory category_filter = 3;
+}
+
+// Response containing blocklists
+message GetBlocklistsResponse {
+  repeated Blocklist blocklists = 1;
+  PaginationMetadata pagination = 2;
+}
+
+// Request to get a specific blocklist
+message GetBlocklistByIDRequest {
+  string blocklist_id = 1;
+}
+
+// Request to create a blocklist
+message CreateBlocklistRequest {
+  string name = 1;
+  string description = 2;
+  repeated BlocklistCategory categories = 3;
+  repeated BlocklistSource sources = 4;
+  map<string, string> labels = 5;
+  string created_by = 6;
+}
+
+// Request to update a blocklist
+message UpdateBlocklistRequest {
+  string blocklist_id = 1;
+  string name = 2;
+  string description = 3;
+  repeated BlocklistCategory categories = 4;
+  repeated BlocklistSource sources = 5;
+  bool enabled = 6;
+  map<string, string> labels = 7;
+  string updated_by = 8;
+}
+
+// Request to delete a blocklist
+message DeleteBlocklistRequest {
+  string blocklist_id = 1;
+  bool delete_entries = 2;
+  string deleted_by = 3;
+}
+
+// Request to get blocklist entries
+message GetBlocklistEntriesRequest {
+  string blocklist_id = 1;
+  PaginationRequest pagination = 2;
+  BlocklistEntryType type_filter = 3;
+  BlocklistCategory category_filter = 4;
+  bool enabled_only = 5;
+}
+
+// Response containing blocklist entries
+message GetBlocklistEntriesResponse {
+  repeated BlocklistEntry entries = 1;
+  PaginationMetadata pagination = 2;
+}
+
+// Request to add an entry
+message AddBlocklistEntryRequest {
+  string blocklist_id = 1;
+  BlocklistEntryType type = 2;
+  string value = 3;
+  BlocklistCategory category = 4;
+  map<string, string> metadata = 5;
+  string created_by = 6;
+}
+
+// Request to remove an entry
+message RemoveBlocklistEntryRequest {
+  string entry_id = 1;
+  string deleted_by = 2;
+}
+
+// Request to bulk add entries
+message BulkAddEntriesRequest {
+  string blocklist_id = 1;
+  repeated AddBlocklistEntryRequest entries = 2;
+}
+
+// Response for bulk add operation
+message BulkAddEntriesResponse {
+  repeated BlocklistEntry created_entries = 1;
+  repeated BulkOperationError errors = 2;
+  int32 success_count = 3;
+  int32 failure_count = 4;
+}
+
+// Request to refresh blocklist from sources
+message RefreshBlocklistRequest {
+  string blocklist_id = 1;
+  bool force = 2; // Force refresh even if not expired
+}
+
+// Response for refresh operation
+message RefreshBlocklistResponse {
+  string blocklist_id = 1;
+  int64 entries_added = 2;
+  int64 entries_removed = 3;
+  int64 entries_updated = 4;
+  google.protobuf.Timestamp completed_at = 5;
+  string status = 6;
+  string error_message = 7;
+}
+
+// Blocklist update stream message
+message BlocklistUpdate {
+  enum UpdateType {
+    UNKNOWN = 0;
+    CREATED = 1;
+    UPDATED = 2;
+    DELETED = 3;
+    ENTRY_ADDED = 4;
+    ENTRY_REMOVED = 5;
+    SYNCED = 6;
+  }
+  UpdateType type = 1;
+  Blocklist blocklist = 2;
+  BlocklistEntry entry = 3;
+  google.protobuf.Timestamp timestamp = 4;
+  string triggered_by = 5;
+}
+
+// Blocklist statistics
+message BlocklistStats {
+  int32 total_blocklists = 1;
+  int32 enabled_blocklists = 2;
+  int32 disabled_blocklists = 3;
+  int64 total_entries = 4;
+  map<string, int64> entries_by_type = 5;
+  map<string, int64> entries_by_category = 6;
+  google.protobuf.Timestamp last_sync = 7;
+}
+
+// Error details for bulk operations
+message BulkOperationError {
+  string entry_value = 1;
+  int32 index = 2;
+  string error_message = 3;
+  ErrorDetail details = 4;
+}
