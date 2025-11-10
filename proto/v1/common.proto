@@ -1,0 +1,91 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+syntax = "proto3";
+
+package phantomdns.dataplane.v1;
+
+option go_package = "github.com/lopster568/phantomDNS/internal/pb/dataplane/v1;datapv1";
+option java_multiple_files = true;
+option java_package = "com.phantomdns.dataplane.v1";
+option csharp_namespace = "PhantomDNS.DataPlane.V1";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+
+// ============================================================================
+// Common Enums and Messages
+// ============================================================================
+
+// Common response status for all RPC operations
+enum ResponseStatus {
+  UNKNOWN = 0;
+  SUCCESS = 1;
+  FAILURE = 2;
+  PARTIAL_SUCCESS = 3;
+}
+
+// Pagination parameters for list operations
+message PaginationRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+  string sort_by = 3;
+  bool ascending = 4;
+}
+
+// Pagination metadata for list responses
+message PaginationMetadata {
+  int32 page = 1;
+  int32 page_size = 2;
+  int64 total_count = 3;
+  int32 total_pages = 4;
+  bool has_next = 5;
+  bool has_previous = 6;
+}
+
+// Error details for comprehensive error handling
+message ErrorDetail {
+  string code = 1;
+  string message = 2;
+  map<string, string> metadata = 3;
+}
+
+// Standard response wrapper for all operations
+message Response {
+  ResponseStatus status = 1;
+  string message = 2;
+  ErrorDetail error = 3;
+  google.protobuf.Timestamp timestamp = 4;
+}
+
+// Audit trail for tracking changes
+message AuditLog {
+  string id = 1;
+  string entity_type = 2;
+  string entity_id = 3;
+  string action = 4;
+  string actor = 5;
+  google.protobuf.Timestamp created_at = 6;
+  map<string, string> changes = 7;
+}
+
+// Health status information
+message HealthStatus {
+  enum Status {
+    UNKNOWN = 0;
+    HEALTHY = 1;
+    DEGRADED = 2;
+    UNHEALTHY = 3;
+  }
+  Status status = 1;
+  string message = 2;
+  repeated string issues = 3;
+  google.protobuf.Duration check_duration = 4;
+}
+
+// Service metadata
+message ServiceInfo {
+  string name = 1;
+  string version = 2;
+  google.protobuf.Timestamp started_at = 3;
+  google.protobuf.Duration uptime = 4;
+  HealthStatus health = 5;
+}

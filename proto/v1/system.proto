@@ -1,0 +1,264 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+syntax = "proto3";
+
+package phantomdns.dataplane.v1;
+
+option go_package = "github.com/lopster568/phantomDNS/internal/pb/dataplane/v1;datapv1";
+option java_multiple_files = true;
+option java_package = "com.phantomdns.dataplane.v1";
+option csharp_namespace = "PhantomDNS.DataPlane.V1";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/duration.proto";
+import "proto/v1/common.proto";
+
+// ============================================================================
+// System and Health Check Service
+// ============================================================================
+
+service SystemService {
+  // Get system status
+  rpc GetSystemStatus(google.protobuf.Empty) returns (SystemStatus);
+  
+  // Get system health
+  rpc GetHealth(google.protobuf.Empty) returns (HealthStatus);
+  
+  // Check specific component health
+  rpc CheckComponentHealth(CheckComponentHealthRequest) returns (ComponentHealth);
+  
+  // Get system metrics
+  rpc GetSystemMetrics(GetSystemMetricsRequest) returns (SystemMetrics);
+  
+  // Get system configuration
+  rpc GetSystemConfig(google.protobuf.Empty) returns (SystemConfig);
+  
+  // Update system configuration
+  rpc UpdateSystemConfig(UpdateSystemConfigRequest) returns (SystemConfig);
+  
+  // Get service version and build info
+  rpc GetVersionInfo(google.protobuf.Empty) returns (VersionInfo);
+  
+  // Stream system events
+  rpc WatchSystemEvents(google.protobuf.Empty) returns (stream SystemEvent);
+  
+  // Get resource usage
+  rpc GetResourceUsage(google.protobuf.Empty) returns (ResourceUsage);
+}
+
+// System status enumeration
+enum SystemStatusEnum {
+  STATUS_UNKNOWN = 0;
+  HEALTHY = 1;
+  DEGRADED = 2;
+  UNHEALTHY = 3;
+  MAINTENANCE = 4;
+}
+
+// Component type enumeration
+enum ComponentType {
+  COMPONENT_UNKNOWN = 0;
+  DNS_ENGINE = 1;
+  POLICY_ENGINE = 2;
+  BLOCKLIST_ENGINE = 3;
+  DATABASE = 4;
+  CACHE = 5;
+  GRPC_SERVER = 6;
+  HTTP_SERVER = 7;
+  STORAGE = 8;
+}
+
+// Component health status
+message ComponentHealth {
+  ComponentType component = 1;
+  HealthStatus.Status status = 2;
+  string message = 3;
+  google.protobuf.Timestamp last_check = 4;
+  google.protobuf.Duration response_time = 5;
+  map<string, string> metadata = 6;
+}
+
+// System status
+message SystemStatus {
+  SystemStatusEnum status = 1;
+  string message = 2;
+  
+  // Service info
+  ServiceInfo service = 3;
+  
+  // Component statuses
+  repeated ComponentHealth components = 4;
+  
+  // Overall statistics
+  int32 healthy_components = 5;
+  int32 degraded_components = 6;
+  int32 unhealthy_components = 7;
+  
+  // Check timestamp
+  google.protobuf.Timestamp checked_at = 8;
+}
+
+// System metrics
+message SystemMetrics {
+  // CPU metrics
+  float cpu_usage_percent = 1;
+  int64 cpu_count = 2;
+  
+  // Memory metrics
+  float memory_usage_percent = 3;
+  int64 memory_total_mb = 4;
+  int64 memory_used_mb = 5;
+  int64 memory_free_mb = 6;
+  
+  // Disk metrics
+  float disk_usage_percent = 7;
+  int64 disk_total_mb = 8;
+  int64 disk_used_mb = 9;
+  int64 disk_free_mb = 10;
+  
+  // Network metrics
+  int64 network_bytes_in = 11;
+  int64 network_bytes_out = 12;
+  int64 network_packets_in = 13;
+  int64 network_packets_out = 14;
+  
+  // Process metrics
+  int64 process_uptime_seconds = 15;
+  int32 goroutines_count = 16;
+  
+  // GC metrics
+  int64 gc_runs = 17;
+  google.protobuf.Duration gc_pause_time = 18;
+  
+  // Timestamp
+  google.protobuf.Timestamp collected_at = 19;
+}
+
+// System configuration
+message SystemConfig {
+  // DNS configuration
+  string dns_listen_addr = 1;
+  int32 dns_port = 2;
+  bool dns_tcp_enabled = 3;
+  bool dns_udp_enabled = 4;
+  int32 dns_worker_threads = 5;
+  int32 dns_query_timeout_ms = 6;
+  
+  // gRPC configuration
+  string grpc_listen_addr = 7;
+  int32 grpc_port = 8;
+  int32 grpc_max_connections = 9;
+  int32 grpc_max_concurrent_streams = 10;
+  
+  // HTTP configuration
+  string http_listen_addr = 11;
+  int32 http_port = 12;
+  
+  // Storage configuration
+  string storage_type = 13; // sqlite, postgres, etc.
+  string storage_connection_string = 14;
+  
+  // Cache configuration
+  string cache_type = 15; // memory, redis, etc.
+  int32 cache_max_entries = 16;
+  google.protobuf.Duration cache_ttl = 17;
+  
+  // Logging configuration
+  string log_level = 18; // debug, info, warn, error
+  string log_format = 19; // json, text
+  
+  // Rate limiting
+  bool rate_limiting_enabled = 20;
+  int32 rate_limit_requests_per_second = 21;
+  
+  // Feature flags
+  map<string, bool> feature_flags = 22;
+  
+  // Custom settings
+  map<string, string> custom_settings = 23;
+}
+
+// Request to check component health
+message CheckComponentHealthRequest {
+  ComponentType component = 1;
+}
+
+// Request for system metrics
+message GetSystemMetricsRequest {
+  bool include_process_metrics = 1;
+  bool include_network_metrics = 2;
+  bool include_gc_metrics = 3;
+}
+
+// Request to update system config
+message UpdateSystemConfigRequest {
+  SystemConfig config = 1;
+  bool apply_immediately = 2;
+  string updated_by = 3;
+}
+
+// Version and build information
+message VersionInfo {
+  string version = 1;
+  string build_number = 2;
+  string git_commit = 3;
+  string git_branch = 4;
+  google.protobuf.Timestamp build_time = 5;
+  string go_version = 6;
+  string os = 7;
+  string arch = 8;
+  map<string, string> dependencies = 9;
+}
+
+// System event for streaming
+message SystemEvent {
+  enum EventType {
+    UNKNOWN = 0;
+    STARTUP = 1;
+    SHUTDOWN = 2;
+    CONFIG_UPDATED = 3;
+    COMPONENT_STATUS_CHANGED = 4;
+    ERROR = 5;
+    WARNING = 6;
+    METRICS_COLLECTED = 7;
+  }
+  EventType type = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  string message = 3;
+  string component = 4;
+  map<string, string> details = 5;
+}
+
+// Resource usage information
+message ResourceUsage {
+  // CPU
+  float cpu_usage_percent = 1;
+  repeated float cpu_usage_per_core = 2;
+  
+  // Memory
+  int64 memory_used_bytes = 3;
+  int64 memory_total_bytes = 4;
+  int64 memory_available_bytes = 5;
+  
+  // Disk
+  int64 disk_used_bytes = 6;
+  int64 disk_total_bytes = 7;
+  
+  // File descriptors
+  int32 file_descriptors_open = 8;
+  int32 file_descriptors_max = 9;
+  
+  // Network connections
+  int32 network_connections = 10;
+  
+  // Goroutines
+  int32 goroutines = 11;
+  
+  // Memory allocations
+  int64 memory_allocations = 12;
+  int64 memory_gc_count = 13;
+  google.protobuf.Duration memory_gc_pause_total = 14;
+  
+  // Collected at
+  google.protobuf.Timestamp collected_at = 15;
+}

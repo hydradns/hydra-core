@@ -1,0 +1,265 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+syntax = "proto3";
+
+package phantomdns.dataplane.v1;
+
+option go_package = "github.com/lopster568/phantomDNS/internal/pb/dataplane/v1;datapv1";
+option java_multiple_files = true;
+option java_package = "com.phantomdns.dataplane.v1";
+option csharp_namespace = "PhantomDNS.DataPlane.V1";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/duration.proto";
+import "proto/v1/common.proto";
+
+// ============================================================================
+// Analytics Service
+// ============================================================================
+
+service AnalyticsService {
+  // Get analytics summary for a time period
+  rpc GetAnalyticsSummary(GetAnalyticsSummaryRequest) returns (AnalyticsSummary);
+  
+  // Get DNS query statistics
+  rpc GetQueryStats(GetQueryStatsRequest) returns (QueryStats);
+  
+  // Get top queried domains
+  rpc GetTopDomains(GetTopDomainsRequest) returns (TopDomainsResponse);
+  
+  // Get policy statistics
+  rpc GetPolicyStats(GetPolicyStatsRequest) returns (PolicyStatsResponse);
+  
+  // Get blocklist statistics
+  rpc GetBlocklistStats(GetBlocklistStatsRequest) returns (BlocklistStatsResponse);
+  
+  // Get query logs with filtering
+  rpc GetQueryLogs(GetQueryLogsRequest) returns (GetQueryLogsResponse);
+  
+  // Export analytics data
+  rpc ExportAnalytics(ExportAnalyticsRequest) returns (ExportAnalyticsResponse);
+  
+  // Stream real-time analytics events
+  rpc WatchAnalytics(google.protobuf.Empty) returns (stream AnalyticsEvent);
+}
+
+// Time range for analytics
+message TimeRange {
+  google.protobuf.Timestamp start_time = 1;
+  google.protobuf.Timestamp end_time = 2;
+}
+
+// DNS query outcome
+enum QueryOutcome {
+  OUTCOME_UNKNOWN = 0;
+  ALLOWED = 1;
+  BLOCKED = 2;
+  REDIRECTED = 3;
+  ERROR = 4;
+}
+
+// DNS query log entry
+message QueryLog {
+  string id = 1;
+  string domain = 2;
+  string query_type = 3;
+  string client_ip = 4;
+  QueryOutcome outcome = 5;
+  
+  // Response details
+  string response = 6;
+  int32 response_code = 7;
+  
+  // Policy/Blocklist that matched
+  string matched_policy_id = 8;
+  string matched_blocklist_id = 9;
+  
+  // Response time
+  google.protobuf.Duration response_time = 10;
+  
+  // Timestamp
+  google.protobuf.Timestamp timestamp = 11;
+  
+  // Metadata
+  map<string, string> metadata = 12;
+}
+
+// Domain statistics
+message DomainStats {
+  string domain = 1;
+  int64 total_queries = 2;
+  int64 allowed_queries = 3;
+  int64 blocked_queries = 4;
+  int64 redirected_queries = 5;
+  double block_rate = 6;
+  google.protobuf.Timestamp first_seen = 7;
+  google.protobuf.Timestamp last_seen = 8;
+}
+
+// Top domains
+message TopDomainsResponse {
+  repeated DomainStats domains = 1;
+  TimeRange time_range = 2;
+  int32 total_unique_domains = 3;
+}
+
+// Policy statistics
+message PolicyStatsResponse {
+  map<string, int64> matches_by_policy = 1;
+  map<string, int64> actions_by_policy = 2;
+  TimeRange time_range = 3;
+}
+
+// Blocklist statistics
+message BlocklistStatsResponse {
+  map<string, int64> matches_by_blocklist = 1;
+  map<string, int64> entries_by_category = 2;
+  TimeRange time_range = 3;
+}
+
+// Analytics summary
+message AnalyticsSummary {
+  int64 total_queries = 1;
+  int64 allowed_queries = 2;
+  int64 blocked_queries = 3;
+  int64 redirected_queries = 4;
+  int64 error_queries = 5;
+  
+  // Rates
+  double block_rate = 6;
+  double error_rate = 7;
+  
+  // Performance
+  google.protobuf.Duration avg_response_time = 8;
+  google.protobuf.Duration p95_response_time = 9;
+  google.protobuf.Duration p99_response_time = 10;
+  
+  // Client statistics
+  int32 unique_clients = 11;
+  
+  // Top entities
+  repeated DomainStats top_domains = 12;
+  map<string, int64> top_policies = 13;
+  map<string, int64> top_blocklists = 14;
+  
+  // Time range
+  TimeRange time_range = 15;
+}
+
+// Query statistics details
+message QueryStats {
+  int64 total_queries = 1;
+  map<string, int64> queries_by_type = 2; // A, AAAA, CNAME, etc.
+  map<string, int64> queries_by_outcome = 3;
+  
+  // Time-based breakdown
+  map<string, int64> queries_by_hour = 4;
+  map<string, int64> queries_by_day = 5;
+  
+  // Client statistics
+  repeated ClientQueryStats client_stats = 6;
+  
+  TimeRange time_range = 7;
+}
+
+// Per-client query statistics
+message ClientQueryStats {
+  string client_ip = 1;
+  int64 total_queries = 2;
+  int64 blocked_queries = 3;
+  double block_rate = 4;
+  map<string, int64> top_domains = 5;
+}
+
+// Request for analytics summary
+message GetAnalyticsSummaryRequest {
+  TimeRange time_range = 1;
+  bool include_top_domains = 2;
+  bool include_policy_stats = 3;
+  bool include_blocklist_stats = 4;
+}
+
+// Request for query statistics
+message GetQueryStatsRequest {
+  TimeRange time_range = 1;
+  bool include_client_stats = 2;
+  int32 max_clients = 3;
+}
+
+// Request for top domains
+message GetTopDomainsRequest {
+  TimeRange time_range = 1;
+  int32 limit = 2;
+  QueryOutcome outcome_filter = 3;
+}
+
+// Request for policy statistics
+message GetPolicyStatsRequest {
+  TimeRange time_range = 1;
+}
+
+// Request for blocklist statistics
+message GetBlocklistStatsRequest {
+  TimeRange time_range = 1;
+}
+
+// Request for query logs
+message GetQueryLogsRequest {
+  PaginationRequest pagination = 1;
+  TimeRange time_range = 2;
+  string domain_filter = 3;
+  string client_ip_filter = 4;
+  QueryOutcome outcome_filter = 5;
+  string policy_id_filter = 6;
+}
+
+// Response containing query logs
+message GetQueryLogsResponse {
+  repeated QueryLog logs = 1;
+  PaginationMetadata pagination = 2;
+}
+
+// Export format
+enum ExportFormat {
+  FORMAT_UNKNOWN = 0;
+  JSON = 1;
+  CSV = 2;
+  PARQUET = 3;
+}
+
+// Request to export analytics
+message ExportAnalyticsRequest {
+  TimeRange time_range = 1;
+  ExportFormat format = 2;
+  bool include_query_logs = 3;
+  bool include_summary = 4;
+  bool include_policy_stats = 5;
+  bool include_blocklist_stats = 6;
+}
+
+// Response for export operation
+message ExportAnalyticsResponse {
+  string export_id = 1;
+  string download_url = 2;
+  ExportFormat format = 3;
+  int64 data_size_bytes = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Duration ttl = 6; // How long the export is valid
+}
+
+// Real-time analytics event
+message AnalyticsEvent {
+  enum EventType {
+    UNKNOWN = 0;
+    QUERY = 1;
+    POLICY_MATCH = 2;
+    BLOCKLIST_MATCH = 3;
+    ERROR = 4;
+  }
+  EventType type = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  string domain = 3;
+  QueryOutcome outcome = 4;
+  string client_ip = 5;
+  map<string, string> details = 6;
+}
