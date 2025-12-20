@@ -7,3 +7,4 @@ go.sum
 data/phantomdns.db
 data/phantomdns.db-shm
 data/phantomdns.db-wal
+go.sum

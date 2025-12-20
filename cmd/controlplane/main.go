@@ -34,6 +34,10 @@ func main() {
 	// Initialize Gin router
 	r := gin.Default()
 	r.Use(middlewares.Logger())
+
+	// CORS middleware (development-friendly). See cmd/controlplane/middlewares/cors.go
+	r.Use(middlewares.CORS())
+
 	routes.RegisterRoutes(r, apiHandler)
 	r.Run(config.GetPort())
 }
