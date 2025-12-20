@@ -18,6 +18,7 @@ import (
 
 func main() {
 	logger.Log.Info("Starting PhantomDNS Data Plane...")
+	logger.Log.Info("Built at ", time.Now().Format(time.RFC3339))
 	// 1. Initialize DB
 	db.InitDB("/app/data/phantomdns.db")
 	// 2. Initialize Repositories (store)
@@ -56,7 +57,7 @@ func main() {
 		}
 		logger.Log.Infof("Blocklisted: %s", h)
 	}
-
+	logger.Log.Infof("Initializing DNS server policies")
 	// 3. Initialize Policy Engine
 	policyEngine := policy.NewPolicyEngine()
 	policies, err := policy.LoadPoliciesFromFile("/app/configs/policies.json")
@@ -66,26 +67,34 @@ func main() {
 	if err := policyEngine.LoadPolicies(policies); err != nil {
 		logger.Log.Fatalf("failed to load snapshot: %v", err)
 	}
+	logger.Log.Infof("Initializing DNS server engine")
 	// 4. Initialize DNS Engine with default config and repos
 	engine, err := dnsengine.NewDNSEngine(config.DefaultConfig.DataPlane, repos, policyEngine)
 	if err != nil {
 		logger.Log.Fatal("Failed to create DNS engine: " + err.Error())
 	}
 
+	logger.Log.Infof("Initializing GRPC server for health checks and metrics")
 	// 6. GRPC server for health checks and metrics can be added here
 	healthService := &server.HealthService{}
 	grpcSrv := server.New(50051, healthService)
 
-	if err := grpcSrv.Start(); err != nil {
-		logger.Log.Fatalf("gRPC server failed: %v", err)
-	}
+	go func() {
+		if err := grpcSrv.Start(); err != nil {
+			logger.Log.Fatalf("gRPC server failed: %v", err)
+		}
+	}()
 
+	logger.Log.Infof("Attaching blocklist checker to DNS engine")
 	// 4.1 Attach blocklist checker to DNS engine
 	engine.AttachBlocklistChecker(repos.Blocklist)
 	// 5. Initialize and Run Server with the engine
+	logger.Log.Infof("Initializing DNS server")
 	srv, err := dnsengine.NewServer(config.DefaultConfig.DataPlane, engine)
 	if err != nil {
 		logger.Log.Fatal("Failed to create server: " + err.Error())
 	}
+
+	logger.Log.Infof("DNS server listening on %s", config.DefaultConfig.DataPlane.ListenAddr)
 	srv.Run()
 }
