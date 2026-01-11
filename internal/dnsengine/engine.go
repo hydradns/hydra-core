@@ -2,6 +2,8 @@
 package dnsengine
 
 import (
+	"sync/atomic"
+
 	"github.com/lopster568/phantomDNS/internal/config"
 	"github.com/lopster568/phantomDNS/internal/logger"
 	"github.com/lopster568/phantomDNS/internal/policy"
@@ -15,11 +17,18 @@ type BlocklistChecker interface {
 	IsBlocked(domain string) (bool, error)
 }
 
+type RuntimeState struct {
+	acceptQueries atomic.Bool
+	// policyEnabled atomic.Bool
+	lastError atomic.Value
+}
+
 type Engine struct {
 	upstreamManager *UpstreamManager
 	repos           *repositories.Store
 	policyEngine    *policy.Engine
 	blocklist       BlocklistChecker
+	state           *RuntimeState
 }
 
 func (e *Engine) AttachBlocklistChecker(b BlocklistChecker) {
@@ -28,6 +37,10 @@ func (e *Engine) AttachBlocklistChecker(b BlocklistChecker) {
 
 func NewDNSEngine(cfg config.DataPlaneConfig, repos *repositories.Store, pE *policy.Engine) (*Engine, error) {
 	mgr, err := NewUpstreamManager(cfg.UpstreamResolvers, 4)
+	state := &RuntimeState{}
+	state.acceptQueries.Store(false)
+	// state.policyEnabled.Store(false)
+
 	if err != nil {
 		return nil, err
 	}
@@ -35,6 +48,7 @@ func NewDNSEngine(cfg config.DataPlaneConfig, repos *repositories.Store, pE *pol
 		upstreamManager: mgr,
 		repos:           repos,
 		policyEngine:    pE,
+		state:           state,
 	}, nil
 }
 
