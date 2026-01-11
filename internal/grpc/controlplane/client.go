@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/lopster568/phantomDNS/proto/healthpb"
+	pb "github.com/lopster568/phantomDNS/internal/gen/proto/phantomdns/v1"
 	"google.golang.org/grpc"
 )
 
 type Client struct {
 	conn   *grpc.ClientConn
-	health healthpb.HealthClient
+	status pb.DataPlaneStatusServiceClient
 }
 
 // New creates and connects the gRPC client.
@@ -23,7 +23,7 @@ func New(address string) (*Client, error) {
 
 	return &Client{
 		conn:   conn,
-		health: healthpb.NewHealthClient(conn),
+		status: pb.NewDataPlaneStatusServiceClient(conn),
 	}, nil
 }
 
@@ -31,14 +31,10 @@ func (c *Client) Close() {
 	c.conn.Close()
 }
 
-// CheckHealth calls the health check RPC.
-func (c *Client) CheckHealth() (string, error) {
+// GetStatus fetches dataplane runtime status.
+func (c *Client) GetStatus() (*pb.StatusResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	resp, err := c.health.Check(ctx, &healthpb.HealthCheckRequest{})
-	if err != nil {
-		return "", err
-	}
-	return resp.Status, nil
+	return c.status.GetStatus(ctx, &pb.StatusRequest{})
 }

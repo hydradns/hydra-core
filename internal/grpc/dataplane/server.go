@@ -1,11 +1,11 @@
-package server
+package dataplane
 
 import (
 	"fmt"
 	"log"
 	"net"
 
-	"github.com/lopster568/phantomDNS/proto/healthpb"
+	pb "github.com/lopster568/phantomDNS/internal/gen/proto/phantomdns/v1"
 	"google.golang.org/grpc"
 )
 
@@ -16,9 +16,10 @@ type Server struct {
 }
 
 // New creates a new gRPC server.
-func New(port int, healthSrv healthpb.HealthServer) *Server {
+func New(port int, statusSrv pb.DataPlaneStatusServiceServer) *Server {
 	s := grpc.NewServer()
-	healthpb.RegisterHealthServer(s, healthSrv)
+	pb.RegisterDataPlaneStatusServiceServer(s, statusSrv)
+
 	return &Server{
 		grpcServer: s,
 		port:       port,

@@ -8,7 +8,7 @@ import (
 	"github.com/lopster568/phantomDNS/cmd/controlplane/handlers"
 	"github.com/lopster568/phantomDNS/cmd/controlplane/middlewares"
 	"github.com/lopster568/phantomDNS/cmd/controlplane/routes"
-	"github.com/lopster568/phantomDNS/internal/grpc/client"
+	client "github.com/lopster568/phantomDNS/internal/grpc/controlplane"
 	"github.com/lopster568/phantomDNS/internal/logger"
 
 	"github.com/gin-gonic/gin"
@@ -22,12 +22,12 @@ func main() {
 	}
 	defer c.Close()
 
-	status, err := c.CheckHealth()
+	status, err := c.GetStatus()
 	if err != nil {
 		log.Fatalf("health check failed: %v", err)
 	}
 
-	logger.Log.Infof("Dataplane Health: %s\n", status)
+	logger.Log.Infof("DNS Engine Status: %s\n", status)
 
 	apiHandler := handlers.NewAPIHandler()
 

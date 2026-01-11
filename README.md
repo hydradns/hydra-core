@@ -67,6 +67,8 @@ PhantomDNS uses a microservices architecture with two main components:
 1. **Data Plane**: The core DNS server handling queries (port 1053)
 2. **Control Plane**: Administrative API for configuration (port 8086)
 
+Note: A file is not just code, it is a concept; and nothing should break the concept of a file, create separations.
+
 ## 🚀 Quick Start
 
 1.  **Clone the repository:**

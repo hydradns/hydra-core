@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package phantomdns.v1;
+
+option go_package = "github.com/lopster568/phantomDNS/internal/gen/proto/phantomdns/v1;v1";
+
+// Request message for querying dataplane status.
+message StatusRequest {}
+
+// Dataplane runtime status.
+message StatusResponse {
+  // Process is running and responding to status RPCs.
+  bool running = 1;
+
+  // Whether DNS engine is currently accepting queries.
+  bool accepting_queries = 2;
+
+  // Whether policy evaluation is enabled.
+  bool policy_enabled = 3;
+
+  // Optional last error message (empty if healthy).
+  string last_error = 4;
+}
+
+// Service exposing dataplane runtime status.
+service DataPlaneStatusService {
+  // Returns the current runtime status of the dataplane.
+  rpc GetStatus(StatusRequest) returns (StatusResponse);
+}
