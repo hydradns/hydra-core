@@ -36,6 +36,17 @@ services:
       - ./data:/app/data
       - ./configs/config.yaml:/app/configs/config.yaml
 
+  debugger:
+    build:
+      context: .
+      dockerfile: docker/debugger.Dockerfile
+    container_name: phantom-debugger
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./data:/app/data
+      - ./configs/config.yaml:/app/configs/config.yaml
+
 networks:
   phantom-net:
     driver: bridge

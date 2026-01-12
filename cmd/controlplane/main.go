@@ -9,7 +9,6 @@ import (
 	"github.com/lopster568/phantomDNS/cmd/controlplane/routes"
 	"github.com/lopster568/phantomDNS/internal/config"
 	client "github.com/lopster568/phantomDNS/internal/grpc/controlplane"
-	"github.com/lopster568/phantomDNS/internal/logger"
 	"github.com/lopster568/phantomDNS/internal/storage/db"
 	"github.com/lopster568/phantomDNS/internal/storage/repositories"
 
@@ -28,16 +27,15 @@ func main() {
 	}
 	defer c.Close()
 
-	status, err := c.GetStatus()
+	// Load the persistent configuration
+	state, err := repos.SystemState.Get()
 	if err != nil {
-		log.Fatalf("health check failed: %v", err)
+		log.Fatalf("failed to load system state: %v", err)
 	}
-
-	logger.Log.Infof("DNS Engine Status: %s\n", status)
-
-	apiHandler := handlers.NewAPIHandler(*repos, c)
+	c.SetAcceptQueries(state.DNSEnabled)
 
 	// Initialize Gin router
+	apiHandler := handlers.NewAPIHandler(*repos, c)
 	r := gin.Default()
 	r.Use(middlewares.Logger())
 
