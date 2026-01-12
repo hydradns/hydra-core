@@ -3,13 +3,13 @@ package dnsengine
 
 import (
 	"sync/atomic"
+	"time"
 
 	"github.com/lopster568/phantomDNS/internal/config"
 	"github.com/lopster568/phantomDNS/internal/logger"
+	"github.com/lopster568/phantomDNS/internal/metrics"
 	"github.com/lopster568/phantomDNS/internal/policy"
-	"github.com/lopster568/phantomDNS/internal/storage/models"
 	"github.com/lopster568/phantomDNS/internal/storage/repositories"
-	"github.com/lopster568/phantomDNS/internal/utils"
 	"github.com/miekg/dns"
 )
 
@@ -25,10 +25,10 @@ type RuntimeState struct {
 
 type Engine struct {
 	upstreamManager *UpstreamManager
-	repos           *repositories.Store
 	policyEngine    *policy.Engine
 	blocklist       BlocklistChecker
 	state           *RuntimeState
+	metrics         *metrics.QueryMetrics
 }
 
 func (e *Engine) AttachBlocklistChecker(b BlocklistChecker) {
@@ -39,16 +39,16 @@ func NewDNSEngine(cfg config.DataPlaneConfig, repos *repositories.Store, pE *pol
 	mgr, err := NewUpstreamManager(cfg.UpstreamResolvers, 4)
 	state := &RuntimeState{}
 	state.acceptQueries.Store(false)
-	// state.policyEnabled.Store(false)
+	qm := metrics.NewQueryMetrics()
 
 	if err != nil {
 		return nil, err
 	}
 	return &Engine{
 		upstreamManager: mgr,
-		repos:           repos,
 		policyEngine:    pE,
 		state:           state,
+		metrics:         qm,
 	}, nil
 }
 
@@ -69,7 +69,6 @@ func (e *Engine) respondBlocked(w dns.ResponseWriter, r *dns.Msg, domain, reason
 	if err := w.WriteMsg(m); err != nil {
 		logger.Log.Error("Failed to write DNS block response: " + err.Error())
 	}
-	go e.logQuery(r.Id, domain, w.RemoteAddr().String(), "block ("+reason+")")
 }
 
 func (e *Engine) respondRedirect(w dns.ResponseWriter, r *dns.Msg, domain, ip string) {
@@ -84,7 +83,6 @@ func (e *Engine) respondRedirect(w dns.ResponseWriter, r *dns.Msg, domain, ip st
 	if err := w.WriteMsg(m); err != nil {
 		logger.Log.Error("Failed to write DNS redirect response: " + err.Error())
 	}
-	go e.logQuery(r.Id, domain, w.RemoteAddr().String(), "redirect")
 }
 
 func (e *Engine) forwardUpstream(w dns.ResponseWriter, r *dns.Msg, domain string) {
@@ -99,33 +97,23 @@ func (e *Engine) forwardUpstream(w dns.ResponseWriter, r *dns.Msg, domain string
 	if err := w.WriteMsg(resp); err != nil {
 		logger.Log.Error("Failed to write DNS response: " + err.Error())
 	}
-	go e.logQuery(resp.Id, domain, w.RemoteAddr().String(), "allow")
-}
-
-func (e *Engine) logQuery(id uint16, domain, client, action string) {
-	if e.repos == nil || e.repos.QueryLogs == nil {
-		return
-	}
-	dnslog := &models.DNSQuery{
-		ID:       uint(id),
-		Domain:   domain,
-		ClientIP: utils.AnonymizeIP(client),
-		Action:   action,
-	}
-	if err := e.repos.QueryLogs.Save(dnslog); err != nil {
-		logger.Log.Error("Failed to log DNS query: " + err.Error())
-	}
 }
 
 // ProcessDNSQuery processes the DNS query and returns a response
 func (e *Engine) ProcessDNSQuery(w dns.ResponseWriter, r *dns.Msg) {
+	start := time.Now()
+	success := false
+
+	defer func() {
+		elapsed := time.Since(start)
+		e.metrics.Record(elapsed, success)
+	}()
+
 	if r == nil || len(r.Question) == 0 {
 		logger.Log.Warn("Received empty DNS query")
 		return
 	}
 	domainName := r.Question[0].Name
-	logger.Log.Infof("Received DNS query for %s", domainName)
-
 	// --- Step 1: Check blocklist first ---
 	if e.blocklist != nil {
 		blocked, err := e.blocklist.IsBlocked(domainName)
@@ -134,6 +122,7 @@ func (e *Engine) ProcessDNSQuery(w dns.ResponseWriter, r *dns.Msg) {
 		} else if blocked {
 			logger.Log.Infof("Blocked by blocklist: %s", domainName)
 			e.respondBlocked(w, r, domainName, "blocklist")
+			success = true
 			return
 		}
 	}
@@ -149,20 +138,14 @@ func (e *Engine) ProcessDNSQuery(w dns.ResponseWriter, r *dns.Msg) {
 	case policy.ActionDeny:
 		logger.Log.Infof("Blocking via policy %s", decision.PolicyID)
 		e.respondBlocked(w, r, domainName, decision.PolicyID)
+		success = true
 
 	case policy.ActionRedirect:
 		e.respondRedirect(w, r, domainName, decision.RedirectIP)
+		success = true
 
 	default: // policy.ActionAllow
 		e.forwardUpstream(w, r, domainName)
-	}
-
-	// ✅ Added: Increment "allow" counter in statistics
-	if e.repos != nil && e.repos.Statistics != nil {
-		go func() {
-			if err := e.repos.Statistics.IncrementCounter("allow"); err != nil {
-				logger.Log.Error("Failed to update statistics: " + err.Error())
-			}
-		}()
+		success = true
 	}
 }
