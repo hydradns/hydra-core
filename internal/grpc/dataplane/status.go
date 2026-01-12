@@ -28,3 +28,16 @@ func (s *StatusService) GetStatus(ctx context.Context, _ *pb.StatusRequest) (*pb
 		LastError:        st.LastError,
 	}, nil
 }
+
+func (s *StatusService) SetAcceptQueries(
+	ctx context.Context,
+	req *pb.SetAcceptQueriesRequest,
+) (*pb.SetAcceptQueriesResponse, error) {
+
+	// Apply desired state to the engine.
+	s.engine.SetAcceptQueries(req.Enabled)
+
+	return &pb.SetAcceptQueriesResponse{
+		Ok: true,
+	}, nil
+}

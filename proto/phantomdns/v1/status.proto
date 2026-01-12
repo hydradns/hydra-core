@@ -26,4 +26,20 @@ message StatusResponse {
 service DataPlaneStatusService {
   // Returns the current runtime status of the dataplane.
   rpc GetStatus(StatusRequest) returns (StatusResponse);
+
+  // Enables or disables DNS query processing in the dataplane.
+  rpc SetAcceptQueries(SetAcceptQueriesRequest)
+  returns (SetAcceptQueriesResponse);
+}
+
+// Request to enable or disable DNS query processing.
+message SetAcceptQueriesRequest {
+  // Whether the dataplane should accept DNS queries.
+  bool enabled = 1;
+}
+
+// Response for SetAcceptQueries operation.
+message SetAcceptQueriesResponse {
+  // Indicates whether the request was applied successfully.
+  bool ok = 1;
 }

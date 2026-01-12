@@ -19,7 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	DataPlaneStatusService_GetStatus_FullMethodName = "/phantomdns.v1.DataPlaneStatusService/GetStatus"
+	DataPlaneStatusService_GetStatus_FullMethodName        = "/phantomdns.v1.DataPlaneStatusService/GetStatus"
+	DataPlaneStatusService_SetAcceptQueries_FullMethodName = "/phantomdns.v1.DataPlaneStatusService/SetAcceptQueries"
 )
 
 // DataPlaneStatusServiceClient is the client API for DataPlaneStatusService service.
@@ -30,6 +31,8 @@ const (
 type DataPlaneStatusServiceClient interface {
 	// Returns the current runtime status of the dataplane.
 	GetStatus(ctx context.Context, in *StatusRequest, opts ...grpc.CallOption) (*StatusResponse, error)
+	// Enables or disables DNS query processing in the dataplane.
+	SetAcceptQueries(ctx context.Context, in *SetAcceptQueriesRequest, opts ...grpc.CallOption) (*SetAcceptQueriesResponse, error)
 }
 
 type dataPlaneStatusServiceClient struct {
@@ -50,6 +53,16 @@ func (c *dataPlaneStatusServiceClient) GetStatus(ctx context.Context, in *Status
 	return out, nil
 }
 
+func (c *dataPlaneStatusServiceClient) SetAcceptQueries(ctx context.Context, in *SetAcceptQueriesRequest, opts ...grpc.CallOption) (*SetAcceptQueriesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetAcceptQueriesResponse)
+	err := c.cc.Invoke(ctx, DataPlaneStatusService_SetAcceptQueries_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DataPlaneStatusServiceServer is the server API for DataPlaneStatusService service.
 // All implementations must embed UnimplementedDataPlaneStatusServiceServer
 // for forward compatibility.
@@ -58,6 +71,8 @@ func (c *dataPlaneStatusServiceClient) GetStatus(ctx context.Context, in *Status
 type DataPlaneStatusServiceServer interface {
 	// Returns the current runtime status of the dataplane.
 	GetStatus(context.Context, *StatusRequest) (*StatusResponse, error)
+	// Enables or disables DNS query processing in the dataplane.
+	SetAcceptQueries(context.Context, *SetAcceptQueriesRequest) (*SetAcceptQueriesResponse, error)
 	mustEmbedUnimplementedDataPlaneStatusServiceServer()
 }
 
@@ -70,6 +85,9 @@ type UnimplementedDataPlaneStatusServiceServer struct{}
 
 func (UnimplementedDataPlaneStatusServiceServer) GetStatus(context.Context, *StatusRequest) (*StatusResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetStatus not implemented")
+}
+func (UnimplementedDataPlaneStatusServiceServer) SetAcceptQueries(context.Context, *SetAcceptQueriesRequest) (*SetAcceptQueriesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetAcceptQueries not implemented")
 }
 func (UnimplementedDataPlaneStatusServiceServer) mustEmbedUnimplementedDataPlaneStatusServiceServer() {
 }
@@ -111,6 +129,24 @@ func _DataPlaneStatusService_GetStatus_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DataPlaneStatusService_SetAcceptQueries_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetAcceptQueriesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DataPlaneStatusServiceServer).SetAcceptQueries(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DataPlaneStatusService_SetAcceptQueries_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DataPlaneStatusServiceServer).SetAcceptQueries(ctx, req.(*SetAcceptQueriesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // DataPlaneStatusService_ServiceDesc is the grpc.ServiceDesc for DataPlaneStatusService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -121,6 +157,10 @@ var DataPlaneStatusService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetStatus",
 			Handler:    _DataPlaneStatusService_GetStatus_Handler,
+		},
+		{
+			MethodName: "SetAcceptQueries",
+			Handler:    _DataPlaneStatusService_SetAcceptQueries_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

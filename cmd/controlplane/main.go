@@ -4,19 +4,25 @@ package main
 import (
 	"log"
 
-	"github.com/lopster568/phantomDNS/cmd/controlplane/config"
 	"github.com/lopster568/phantomDNS/cmd/controlplane/handlers"
 	"github.com/lopster568/phantomDNS/cmd/controlplane/middlewares"
 	"github.com/lopster568/phantomDNS/cmd/controlplane/routes"
+	"github.com/lopster568/phantomDNS/internal/config"
 	client "github.com/lopster568/phantomDNS/internal/grpc/controlplane"
 	"github.com/lopster568/phantomDNS/internal/logger"
+	"github.com/lopster568/phantomDNS/internal/storage/db"
+	"github.com/lopster568/phantomDNS/internal/storage/repositories"
 
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
+	// Initialize database
+	db.InitDB("/app/data/phantomdns.db")
+	repos := repositories.NewStore(db.DB)
+
 	// Initialize grpc client
-	c, err := client.New("dataplane:50051")
+	c, err := client.New(config.DefaultConfig.DataPlane.GRPCServer.ListenAddr)
 	if err != nil {
 		log.Fatalf("failed to connect to dataplane: %v", err)
 	}
@@ -29,7 +35,7 @@ func main() {
 
 	logger.Log.Infof("DNS Engine Status: %s\n", status)
 
-	apiHandler := handlers.NewAPIHandler()
+	apiHandler := handlers.NewAPIHandler(*repos, c)
 
 	// Initialize Gin router
 	r := gin.Default()
@@ -39,5 +45,5 @@ func main() {
 	r.Use(middlewares.CORS())
 
 	routes.RegisterRoutes(r, apiHandler)
-	r.Run(config.GetPort())
+	r.Run(config.DefaultConfig.ControlPlane.ListenAddr)
 }

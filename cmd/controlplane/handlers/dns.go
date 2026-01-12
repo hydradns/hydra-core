@@ -75,17 +75,37 @@ func (h *APIHandler) ToggleDnsEngine(c *gin.Context) {
 		errMsg := err.Error()
 		c.JSON(http.StatusBadRequest, ResponseGeneric{
 			Status: "error",
-			Data:   nil,
 			Error:  &errMsg,
 		})
 		return
 	}
-	// TODO: Implement logic to toggle DNS engine via gRPC
-	dnsEngineEnabled = req.Enabled
+
+	// 1. Persist desired state (source of truth)
+	if err := h.Store.SystemState.SetDNSEnabled(req.Enabled); err != nil {
+		errMsg := "failed to persist DNS engine state"
+		c.JSON(http.StatusInternalServerError, ResponseGeneric{
+			Status: "error",
+			Error:  &errMsg,
+		})
+		return
+	}
+
+	// 2. Apply desired state to dataplane via gRPC
+	if err := h.DataPlaneClient.SetAcceptQueries(req.Enabled); err != nil {
+		errMsg := "failed to apply DNS engine state to dataplane"
+		c.JSON(http.StatusBadGateway, ResponseGeneric{
+			Status: "error",
+			Error:  &errMsg,
+		})
+		return
+	}
+
+	// 3. Respond with acknowledged intent
 	c.JSON(http.StatusOK, ResponseGeneric{
 		Status: "success",
-		Data:   map[string]interface{}{"enabled": req.Enabled},
-		Error:  nil,
+		Data: map[string]interface{}{
+			"enabled": req.Enabled,
+		},
 	})
 }
 

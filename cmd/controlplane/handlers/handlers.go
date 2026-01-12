@@ -1,13 +1,22 @@
 package handlers
 
+import (
+	client "github.com/lopster568/phantomDNS/internal/grpc/controlplane"
+	"github.com/lopster568/phantomDNS/internal/storage/repositories"
+)
+
 // APIHandler contains dependencies for API endpoints
 type APIHandler struct {
-	// TODO: Add dependencies as needed (gRPC client, database, etc.)
+	Store           repositories.Store
+	DataPlaneClient *client.Client
 }
 
-// NewAPIHandler creates a new API handler
-func NewAPIHandler() *APIHandler {
+func NewAPIHandler(
+	store repositories.Store,
+	dataPlaneClient *client.Client,
+) *APIHandler {
 	return &APIHandler{
-		// TODO: Initialize dependencies
+		Store:           store,
+		DataPlaneClient: dataPlaneClient,
 	}
 }

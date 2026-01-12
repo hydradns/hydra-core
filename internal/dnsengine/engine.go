@@ -52,6 +52,10 @@ func NewDNSEngine(cfg config.DataPlaneConfig, repos *repositories.Store, pE *pol
 	}, nil
 }
 
+func (e *Engine) SetAcceptQueries(enabled bool) {
+	e.state.acceptQueries.Store(enabled)
+}
+
 // Cleanup the resources used by the Engine
 func (e *Engine) Shutdown() {
 	if e.upstreamManager != nil {

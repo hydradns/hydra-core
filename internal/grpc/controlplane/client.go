@@ -38,3 +38,13 @@ func (c *Client) GetStatus() (*pb.StatusResponse, error) {
 
 	return c.status.GetStatus(ctx, &pb.StatusRequest{})
 }
+
+func (c *Client) SetAcceptQueries(enabled bool) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	_, err := c.status.SetAcceptQueries(ctx, &pb.SetAcceptQueriesRequest{
+		Enabled: enabled,
+	})
+	return err
+}
