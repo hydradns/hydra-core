@@ -8,9 +8,9 @@ import (
 
 // DnsEngineStatusData represents DNS engine status
 type DnsEngineStatusData struct {
-	Enabled        bool    `json:"enabled"`
-	AvgQueryTimeMs float64 `json:"avg_query_time_ms"`
-	QueryRateQps   float64 `json:"query_rate_qps"`
+	Enabled          bool   `json:"enabled"`
+	AcceptingQueries bool   `json:"accepting_queries"`
+	LastError        string `json:"last_error"`
 }
 
 // ResponseDnsEngineStatus represents DNS engine status response
@@ -52,19 +52,40 @@ var mockResolvers = []Resolver{
 	{ID: "2", Name: "Cloudflare DNS", Address: "1.1.1.1", Protocol: "udp"},
 }
 
-var dnsEngineEnabled = true
-
 // GetDnsEngineStatus handles GET /dns/engine
 func (h *APIHandler) GetDnsEngineStatus(c *gin.Context) {
-	// TODO: Implement logic to fetch DNS engine status from dataplane
+	// 1. Fetch desired state from DB
+	state, err := h.Store.SystemState.Get()
+	if err != nil {
+		errMsg := "failed to fetch desired DNS engine state"
+		c.JSON(http.StatusInternalServerError, ResponseDnsEngineStatus{
+			Status: "error",
+			Data:   DnsEngineStatusData{},
+			Error:  &errMsg,
+		})
+		return
+	}
+
+	// 2. Fetch actual state from dataplane
+	status, err := h.DataPlaneClient.GetStatus()
+	if err != nil {
+		errMsg := "failed to fetch DNS engine runtime status"
+		c.JSON(http.StatusBadGateway, ResponseDnsEngineStatus{
+			Status: "error",
+			Data:   DnsEngineStatusData{},
+			Error:  &errMsg,
+		})
+		return
+	}
+
+	// 3. Combine intent + reality
 	c.JSON(http.StatusOK, ResponseDnsEngineStatus{
 		Status: "success",
 		Data: DnsEngineStatusData{
-			Enabled:        dnsEngineEnabled,
-			AvgQueryTimeMs: 10.4,
-			QueryRateQps:   350.0,
+			Enabled:          state.DNSEnabled,        // desired
+			AcceptingQueries: status.AcceptingQueries, // actual
+			LastError:        status.LastError,
 		},
-		Error: nil,
 	})
 }
 
