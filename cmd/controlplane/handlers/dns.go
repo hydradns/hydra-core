@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -87,6 +89,64 @@ func (h *APIHandler) GetDnsEngineStatus(c *gin.Context) {
 			LastError:        status.LastError,
 		},
 	})
+}
+
+// GetDnsMetrics handles GET /metrics
+// It returns live DNS query performance metrics fetched from the dataplane.
+func (h *APIHandler) GetDnsMetrics(c *gin.Context) {
+	// 1. Fetch live metrics from dataplane
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+	defer cancel()
+
+	metrics, err := h.DataPlaneClient.GetLiveQueryMetrics(ctx)
+	if err != nil {
+		errMsg := "failed to fetch live DNS metrics from dataplane"
+		c.JSON(http.StatusBadGateway, ResponseGeneric{
+			Status: "error",
+			Error:  &errMsg,
+		})
+		return
+	}
+
+	// 2. Compute derived values (interpretation only)
+	var errorRate float64
+	if metrics.TotalQueries > 0 {
+		errorRate = float64(metrics.ErrorQueries) / float64(metrics.TotalQueries)
+	}
+
+	grade := gradeDnsPerformance(metrics.P95Ms, errorRate)
+
+	// 3. Respond with observational data + interpretation
+	c.JSON(http.StatusOK, ResponseGeneric{
+		Status: "success",
+		Data: map[string]interface{}{
+			"window_seconds": metrics.WindowSizeSeconds,
+			"queries": map[string]interface{}{
+				"total":      metrics.TotalQueries,
+				"errors":     metrics.ErrorQueries,
+				"error_rate": errorRate,
+			},
+			"latency_ms": map[string]interface{}{
+				"p50": metrics.P50Ms,
+				"p95": metrics.P95Ms,
+				"p99": metrics.P99Ms,
+			},
+			"grade": grade,
+		},
+	})
+}
+
+func gradeDnsPerformance(p95Ms uint64, errorRate float64) string {
+	switch {
+	case p95Ms < 20 && errorRate < 0.001:
+		return "excellent"
+	case p95Ms < 50 && errorRate < 0.01:
+		return "good"
+	case p95Ms < 100:
+		return "degraded"
+	default:
+		return "bad"
+	}
 }
 
 // ToggleDnsEngine handles POST /dns/engine

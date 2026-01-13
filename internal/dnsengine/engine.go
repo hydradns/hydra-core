@@ -101,6 +101,10 @@ func (e *Engine) forwardUpstream(w dns.ResponseWriter, r *dns.Msg, domain string
 
 // ProcessDNSQuery processes the DNS query and returns a response
 func (e *Engine) ProcessDNSQuery(w dns.ResponseWriter, r *dns.Msg) {
+	if !e.state.acceptQueries.Load() {
+		return
+	}
+
 	start := time.Now()
 	success := false
 
@@ -110,9 +114,9 @@ func (e *Engine) ProcessDNSQuery(w dns.ResponseWriter, r *dns.Msg) {
 	}()
 
 	if r == nil || len(r.Question) == 0 {
-		logger.Log.Warn("Received empty DNS query")
 		return
 	}
+
 	domainName := r.Question[0].Name
 	// --- Step 1: Check blocklist first ---
 	if e.blocklist != nil {

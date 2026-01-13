@@ -6,12 +6,15 @@ import (
 	"time"
 
 	pb "github.com/lopster568/phantomDNS/internal/gen/proto/phantomdns/v1"
+	v1 "github.com/lopster568/phantomDNS/internal/gen/proto/phantomdns/v1"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type Client struct {
-	conn   *grpc.ClientConn
-	status pb.DataPlaneStatusServiceClient
+	conn    *grpc.ClientConn
+	status  pb.DataPlaneStatusServiceClient
+	metrics pb.DataPlaneMetricsServiceClient
 }
 
 // New creates and connects the gRPC client.
@@ -22,8 +25,9 @@ func New(address string) (*Client, error) {
 	}
 
 	return &Client{
-		conn:   conn,
-		status: pb.NewDataPlaneStatusServiceClient(conn),
+		conn:    conn,
+		status:  pb.NewDataPlaneStatusServiceClient(conn),
+		metrics: pb.NewDataPlaneMetricsServiceClient(conn),
 	}, nil
 }
 
@@ -47,4 +51,8 @@ func (c *Client) SetAcceptQueries(enabled bool) error {
 		Enabled: enabled,
 	})
 	return err
+}
+
+func (c *Client) GetLiveQueryMetrics(ctx context.Context) (*v1.LiveQueryMetrics, error) {
+	return c.metrics.GetLiveQueryMetrics(ctx, &emptypb.Empty{})
 }
