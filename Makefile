@@ -15,6 +15,9 @@ setup:
 # Build binaries
 build:
 	@echo "🏗️ Building PhantomCore..."
+	buf lint
+	buf generate
+	@echo "🔨 Compiling binaries..."
 	go build -o bin/controlplane ./cmd/controlplane
 	go build -o bin/dataplane ./cmd/dataplane
 	@echo "✅ Build completed!"

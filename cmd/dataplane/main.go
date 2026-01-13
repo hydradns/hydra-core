@@ -77,7 +77,8 @@ func main() {
 	logger.Log.Infof("Initializing GRPC server for health checks and metrics")
 	// 6. GRPC server for health checks and metrics can be added here
 	statusService := dataplanegrpc.NewStatusService(engine)
-	grpcSrv := dataplanegrpc.New(50051, statusService)
+	metricsService := dataplanegrpc.NewMetricsService(engine)
+	grpcSrv := dataplanegrpc.New(config.DefaultConfig.DataPlane.GRPCServer.Port, statusService, metricsService)
 
 	go func() {
 		logger.Log.Info("Starting dataplane gRPC server on :50051")

@@ -16,9 +16,10 @@ type Server struct {
 }
 
 // New creates a new gRPC server.
-func New(port int, statusSrv pb.DataPlaneStatusServiceServer) *Server {
+func New(port int, statusSrv pb.DataPlaneStatusServiceServer, metricsSrv pb.DataPlaneMetricsServiceServer) *Server {
 	s := grpc.NewServer()
 	pb.RegisterDataPlaneStatusServiceServer(s, statusSrv)
+	pb.RegisterDataPlaneMetricsServiceServer(s, metricsSrv)
 
 	return &Server{
 		grpcServer: s,

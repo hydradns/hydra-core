@@ -11,6 +11,8 @@ import (
 )
 
 type MetricsService struct {
+	pb.UnimplementedDataPlaneMetricsServiceServer
+
 	engine *dnsengine.Engine
 }
 

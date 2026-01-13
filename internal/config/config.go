@@ -15,6 +15,7 @@ type Config struct {
 
 type GRPCServerConfig struct {
 	ListenAddr string `yaml:"listen_addr"`
+	Port       int    `yaml:"port"`
 }
 
 type DataPlaneConfig struct {
