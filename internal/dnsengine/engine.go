@@ -149,3 +149,7 @@ func (e *Engine) ProcessDNSQuery(w dns.ResponseWriter, r *dns.Msg) {
 		success = true
 	}
 }
+
+func (e *Engine) Metrics() *metrics.QueryMetrics {
+	return e.metrics
+}
