@@ -2,6 +2,11 @@
 package repositories
 
 import (
+	"fmt"
+	"net"
+	"strconv"
+
+	"github.com/google/uuid"
 	"github.com/lopster568/phantomDNS/internal/storage/models"
 	"gorm.io/gorm"
 )
@@ -13,6 +18,7 @@ type ResolverRepository interface {
 	CreateResolver(resolver *models.UpstreamResolver) error
 	UpdateResolver(resolver *models.UpstreamResolver) error
 	DisableResolver(id string) error
+	BootstrapResolvers(cfgResolvers []string) error
 }
 
 // Implementation
@@ -59,4 +65,45 @@ func (r *ResolverRepo) DisableResolver(id string) error {
 	return r.db.Model(&models.UpstreamResolver{}).
 		Where("id = ?", id).
 		Update("enabled", false).Error
+}
+func (r *ResolverRepo) BootstrapResolvers(
+	cfgResolvers []string,
+) error {
+	existing, err := r.ListResolvers()
+	if err != nil {
+		return err
+	}
+
+	// DB already initialized → do nothing
+	if len(existing) > 0 {
+		return nil
+	}
+
+	for i, raw := range cfgResolvers {
+		host, portStr, err := net.SplitHostPort(raw)
+		if err != nil {
+			return fmt.Errorf("invalid upstream resolver %q: %w", raw, err)
+		}
+
+		port, err := strconv.Atoi(portStr)
+		if err != nil {
+			return fmt.Errorf("invalid port in upstream resolver %q: %w", raw, err)
+		}
+
+		resolver := &models.UpstreamResolver{
+			ID:       uuid.NewString(),
+			Name:     "bootstrap-" + host,
+			Address:  host,
+			Port:     port,
+			Scope:    models.ResolverPublic,
+			Priority: i,
+			Enabled:  true,
+		}
+
+		if err := r.CreateResolver(resolver); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

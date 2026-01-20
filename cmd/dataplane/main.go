@@ -23,6 +23,7 @@ func main() {
 	db.InitDB("/app/data/phantomdns.db")
 	// 2. Initialize Repositories (store)
 	repos := repositories.NewStore(db.DB)
+	repos.Resolver.BootstrapResolvers(config.DefaultConfig.DataPlane.UpstreamResolvers)
 	// 2.1 Blocklist Engine
 	blEngine := blocklist.NewEngine(repos.Blocklist)
 	// 4. Create a fake blocklist source (can be a small plain-text domain list)
@@ -69,7 +70,7 @@ func main() {
 	}
 	logger.Log.Infof("Initializing DNS server engine")
 	// 4. Initialize DNS Engine with default config and repos
-	engine, err := dnsengine.NewDNSEngine(config.DefaultConfig.DataPlane, repos, policyEngine)
+	engine, err := dnsengine.NewDNSEngine(repos, policyEngine)
 	if err != nil {
 		logger.Log.Fatal("Failed to create DNS engine: " + err.Error())
 	}

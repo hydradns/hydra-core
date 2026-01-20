@@ -5,7 +5,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/lopster568/phantomDNS/internal/config"
 	"github.com/lopster568/phantomDNS/internal/logger"
 	"github.com/lopster568/phantomDNS/internal/metrics"
 	"github.com/lopster568/phantomDNS/internal/policy"
@@ -35,8 +34,14 @@ func (e *Engine) AttachBlocklistChecker(b BlocklistChecker) {
 	e.blocklist = b
 }
 
-func NewDNSEngine(cfg config.DataPlaneConfig, repos *repositories.Store, pE *policy.Engine) (*Engine, error) {
-	mgr, err := NewUpstreamManager(cfg.UpstreamResolvers, 4)
+func NewDNSEngine(repos *repositories.Store, pE *policy.Engine) (*Engine, error) {
+	resolvers, err := repos.Resolver.ListResolvers()
+	if err != nil {
+		logger.Log.Error("Failed to list upstream resolvers: " + err.Error())
+		return nil, err
+	}
+
+	mgr, err := NewUpstreamManager(resolvers, 4)
 	state := &RuntimeState{}
 	state.acceptQueries.Store(false)
 	qm := metrics.NewQueryMetrics()
