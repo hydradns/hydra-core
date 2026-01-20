@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package phantomdns.v1;
+
+option go_package = "github.com/lopster568/phantomDNS/internal/gen/proto/phantomdns/v1;v1";
+
+import "google/protobuf/empty.proto";
+
+// LiveQueryMetrics represents real-time DNS query performance
+// over a rolling observation window in the dataplane.
+message LiveQueryMetrics {
+  // Duration of the rolling metrics window, in seconds.
+  uint64 window_size_seconds = 1;
+
+  // Total number of DNS queries observed in the window.
+  uint64 total_queries = 2;
+
+  // Total number of DNS queries that resulted in errors.
+  uint64 error_queries = 3;
+
+  // Estimated p50 (median) DNS query latency in milliseconds.
+  uint64 p50_ms = 4;
+
+  // Estimated p95 DNS query latency in milliseconds.
+  uint64 p95_ms = 5;
+
+  // Estimated p99 DNS query latency in milliseconds.
+  uint64 p99_ms = 6;
+}
+
+// DataPlaneMetricsService exposes read-only, real-time
+// performance metrics from the DNS dataplane.
+service DataPlaneMetricsService {
+  // GetLiveQueryMetrics returns current rolling-window
+  // DNS query performance metrics from the dataplane.
+  rpc GetLiveQueryMetrics(google.protobuf.Empty)
+  returns (LiveQueryMetrics);
+}

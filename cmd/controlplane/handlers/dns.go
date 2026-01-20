@@ -1,16 +1,18 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
 // DnsEngineStatusData represents DNS engine status
 type DnsEngineStatusData struct {
-	Enabled        bool    `json:"enabled"`
-	AvgQueryTimeMs float64 `json:"avg_query_time_ms"`
-	QueryRateQps   float64 `json:"query_rate_qps"`
+	Enabled          bool   `json:"enabled"`
+	AcceptingQueries bool   `json:"accepting_queries"`
+	LastError        string `json:"last_error"`
 }
 
 // ResponseDnsEngineStatus represents DNS engine status response
@@ -52,20 +54,101 @@ var mockResolvers = []Resolver{
 	{ID: "2", Name: "Cloudflare DNS", Address: "1.1.1.1", Protocol: "udp"},
 }
 
-var dnsEngineEnabled = true
-
 // GetDnsEngineStatus handles GET /dns/engine
 func (h *APIHandler) GetDnsEngineStatus(c *gin.Context) {
-	// TODO: Implement logic to fetch DNS engine status from dataplane
+	// 1. Fetch desired state from DB
+	state, err := h.Store.SystemState.Get()
+	if err != nil {
+		errMsg := "failed to fetch desired DNS engine state"
+		c.JSON(http.StatusInternalServerError, ResponseDnsEngineStatus{
+			Status: "error",
+			Data:   DnsEngineStatusData{},
+			Error:  &errMsg,
+		})
+		return
+	}
+
+	// 2. Fetch actual state from dataplane
+	status, err := h.DataPlaneClient.GetStatus()
+	if err != nil {
+		errMsg := "failed to fetch DNS engine runtime status"
+		c.JSON(http.StatusBadGateway, ResponseDnsEngineStatus{
+			Status: "error",
+			Data:   DnsEngineStatusData{},
+			Error:  &errMsg,
+		})
+		return
+	}
+
+	// 3. Combine intent + reality
 	c.JSON(http.StatusOK, ResponseDnsEngineStatus{
 		Status: "success",
 		Data: DnsEngineStatusData{
-			Enabled:        dnsEngineEnabled,
-			AvgQueryTimeMs: 10.4,
-			QueryRateQps:   350.0,
+			Enabled:          state.DNSEnabled,        // desired
+			AcceptingQueries: status.AcceptingQueries, // actual
+			LastError:        status.LastError,
 		},
-		Error: nil,
 	})
+}
+
+// GetDnsMetrics handles GET /metrics
+// It returns live DNS query performance metrics fetched from the dataplane.
+func (h *APIHandler) GetDnsMetrics(c *gin.Context) {
+	// 1. Fetch live metrics from dataplane
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+	defer cancel()
+
+	metrics, err := h.DataPlaneClient.GetLiveQueryMetrics(ctx)
+	if err != nil {
+		errMsg := "failed to fetch live DNS metrics from dataplane"
+		c.JSON(http.StatusBadGateway, ResponseGeneric{
+			Status: "error",
+			Error:  &errMsg,
+		})
+		return
+	}
+
+	// 2. Compute derived values (interpretation only)
+	var errorRate float64
+	if metrics.TotalQueries > 0 {
+		errorRate = float64(metrics.ErrorQueries) / float64(metrics.TotalQueries)
+	}
+
+	grade := gradeDnsPerformance(metrics.P95Ms, errorRate)
+
+	// 3. Respond with observational data + interpretation
+	c.JSON(http.StatusOK, ResponseGeneric{
+		Status: "success",
+		Data: map[string]interface{}{
+			"window_seconds": metrics.WindowSizeSeconds,
+			"queries": map[string]interface{}{
+				"total":      metrics.TotalQueries,
+				"errors":     metrics.ErrorQueries,
+				"error_rate": errorRate,
+			},
+			"latency_ms": map[string]interface{}{
+				"p50": metrics.P50Ms,
+				"p95": metrics.P95Ms,
+				"p99": metrics.P99Ms,
+			},
+			"grade": grade,
+		},
+	})
+}
+
+func gradeDnsPerformance(p95Ms uint64, errorRate float64) string {
+	switch {
+	case p95Ms < 20 && errorRate < 0.001:
+		return "excellent"
+	case p95Ms < 50 && errorRate < 0.01:
+		return "good"
+	case p95Ms < 100:
+		return "degraded"
+	case p95Ms >= 5000:
+		return "unknown"
+	default:
+		return "bad"
+	}
 }
 
 // ToggleDnsEngine handles POST /dns/engine
@@ -75,17 +158,37 @@ func (h *APIHandler) ToggleDnsEngine(c *gin.Context) {
 		errMsg := err.Error()
 		c.JSON(http.StatusBadRequest, ResponseGeneric{
 			Status: "error",
-			Data:   nil,
 			Error:  &errMsg,
 		})
 		return
 	}
-	// TODO: Implement logic to toggle DNS engine via gRPC
-	dnsEngineEnabled = req.Enabled
+
+	// 1. Persist desired state (source of truth)
+	if err := h.Store.SystemState.SetDNSEnabled(req.Enabled); err != nil {
+		errMsg := "failed to persist DNS engine state"
+		c.JSON(http.StatusInternalServerError, ResponseGeneric{
+			Status: "error",
+			Error:  &errMsg,
+		})
+		return
+	}
+
+	// 2. Apply desired state to dataplane via gRPC
+	if err := h.DataPlaneClient.SetAcceptQueries(req.Enabled); err != nil {
+		errMsg := "failed to apply DNS engine state to dataplane"
+		c.JSON(http.StatusBadGateway, ResponseGeneric{
+			Status: "error",
+			Error:  &errMsg,
+		})
+		return
+	}
+
+	// 3. Respond with acknowledged intent
 	c.JSON(http.StatusOK, ResponseGeneric{
 		Status: "success",
-		Data:   map[string]interface{}{"enabled": req.Enabled},
-		Error:  nil,
+		Data: map[string]interface{}{
+			"enabled": req.Enabled,
+		},
 	})
 }
 

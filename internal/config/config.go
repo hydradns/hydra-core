@@ -13,9 +13,15 @@ type Config struct {
 	ControlPlane ControlPlaneConfig `yaml:"controlplane"`
 }
 
+type GRPCServerConfig struct {
+	ListenAddr string `yaml:"listen_addr"`
+	Port       int    `yaml:"port"`
+}
+
 type DataPlaneConfig struct {
-	ListenAddr        string   `yaml:"listen_addr"`
-	UpstreamResolvers []string `yaml:"upstream_resolvers"`
+	ListenAddr        string           `yaml:"listen_addr"`
+	UpstreamResolvers []string         `yaml:"upstream_resolvers"`
+	GRPCServer        GRPCServerConfig `yaml:"grpc_server"`
 }
 
 type ControlPlaneConfig struct {

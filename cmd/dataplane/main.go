@@ -8,7 +8,7 @@ import (
 	"github.com/lopster568/phantomDNS/internal/blocklist"
 	"github.com/lopster568/phantomDNS/internal/config"
 	"github.com/lopster568/phantomDNS/internal/dnsengine"
-	"github.com/lopster568/phantomDNS/internal/grpc/server"
+	dataplanegrpc "github.com/lopster568/phantomDNS/internal/grpc/dataplane"
 	"github.com/lopster568/phantomDNS/internal/logger"
 	"github.com/lopster568/phantomDNS/internal/policy"
 	"github.com/lopster568/phantomDNS/internal/storage/db"
@@ -76,10 +76,12 @@ func main() {
 
 	logger.Log.Infof("Initializing GRPC server for health checks and metrics")
 	// 6. GRPC server for health checks and metrics can be added here
-	healthService := &server.HealthService{}
-	grpcSrv := server.New(50051, healthService)
+	statusService := dataplanegrpc.NewStatusService(engine)
+	metricsService := dataplanegrpc.NewMetricsService(engine)
+	grpcSrv := dataplanegrpc.New(config.DefaultConfig.DataPlane.GRPCServer.Port, statusService, metricsService)
 
 	go func() {
+		logger.Log.Info("Starting dataplane gRPC server on :50051")
 		if err := grpcSrv.Start(); err != nil {
 			logger.Log.Fatalf("gRPC server failed: %v", err)
 		}
