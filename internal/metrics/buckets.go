@@ -2,7 +2,6 @@
 package metrics
 
 import (
-	"math"
 	"time"
 )
 
@@ -33,7 +32,7 @@ var bucketUpperBounds = [...]time.Duration{
 	100 * time.Millisecond,
 	250 * time.Millisecond,
 	500 * time.Millisecond,
-	time.Duration(math.MaxInt64), // effectively "infinite"
+	5 * time.Second, // cap worst
 }
 
 func BucketForLatency(d time.Duration) LatencyBucket {

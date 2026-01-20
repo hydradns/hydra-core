@@ -144,6 +144,8 @@ func gradeDnsPerformance(p95Ms uint64, errorRate float64) string {
 		return "good"
 	case p95Ms < 100:
 		return "degraded"
+	case p95Ms >= 5000:
+		return "unknown"
 	default:
 		return "bad"
 	}

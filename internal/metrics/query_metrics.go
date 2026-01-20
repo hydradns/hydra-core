@@ -2,6 +2,7 @@
 package metrics
 
 import (
+	"math"
 	"sync/atomic"
 	"time"
 )
@@ -119,8 +120,10 @@ func EstimatePercentile(buckets [BucketCount]uint64, p float64) time.Duration {
 	if total == 0 {
 		return 0
 	}
-
-	target := uint64(float64(total) * p)
+	target := uint64(math.Ceil(float64(total) * p))
+	if target == 0 {
+		target = 1
+	}
 
 	var cumulative uint64
 	for i, c := range buckets {
