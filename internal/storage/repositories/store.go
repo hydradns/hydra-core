@@ -11,6 +11,7 @@ type Store struct {
 	Blocklist   BlocklistRepository
 	Statistics  StatisticsRepository
 	SystemState SystemStateRepository
+	Resolver    ResolverRepository
 	// Policies  PolicyRepository
 	// Stats     StatsRepository
 	// add more repos here...
@@ -25,6 +26,7 @@ func NewStore(db *gorm.DB) *Store {
 		&models.BlocklistEntry{},
 		&models.Statistics{},
 		&models.SystemState{},
+		&models.UpstreamResolver{},
 		// &models.Policy{},
 		// &models.Statistic{},
 		// &models.BlockedDomain{},
@@ -36,6 +38,7 @@ func NewStore(db *gorm.DB) *Store {
 		Blocklist:   NewBlocklistRepo(db),
 		Statistics:  NewGormStatisticsRepo(db),
 		SystemState: NewSystemStateRepo(db),
+		Resolver:    NewResolverRepo(db),
 		// Policies:  NewGormPolicyRepo(db),
 		// Stats:     NewGormStatsRepo(db),
 	}

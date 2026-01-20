@@ -10,27 +10,12 @@ import (
 	"time"
 
 	"github.com/lopster568/phantomDNS/internal/logger"
+	"github.com/lopster568/phantomDNS/internal/storage/models"
 	"github.com/miekg/dns"
 )
 
-type ResolverScope string
-
-const (
-	ResolverPublic  ResolverScope = "public"
-	ResolverPrivate ResolverScope = "private"
-)
-
-type UpstreamResolver struct {
-	ID       string // stable identity (UUID or hash)
-	Name     string
-	Address  string // IP
-	Port     int
-	Type     ResolverScope
-	Priority int // lower = earlier
-}
-
 type ManagedResolver struct {
-	meta  UpstreamResolver
+	meta  models.UpstreamResolver
 	pool  *UpstreamPool
 	state atomic.Value // healthy / degraded / down
 }
@@ -48,7 +33,7 @@ const (
 )
 
 // NewUpstreamManager builds a pool for each configured resolver
-func NewUpstreamManager(resolvers []UpstreamResolver, poolSize int) (*UpstreamManager, error) {
+func NewUpstreamManager(resolvers []models.UpstreamResolver, poolSize int) (*UpstreamManager, error) {
 	m := &UpstreamManager{}
 
 	for _, r := range resolvers {
