@@ -12,10 +12,8 @@ import (
 )
 
 const (
-	defaultDialTimeout  = 5 * time.Second
-	defaultQueryTimeout = 5 * time.Second
-	defaultKeepAlive    = 30 * time.Second
-	maxRetries          = 3
+	defaultDialTimeout = 5 * time.Second
+	defaultKeepAlive   = 30 * time.Second
 )
 
 // UDPClient is a small wrapper around a reusable UDP socket for a single upstream.
@@ -215,7 +213,7 @@ func (p *UpstreamPool) releaseTCPConn(idx int, hadErr bool) {
 func (p *UpstreamPool) Exchange(q *dns.Msg, timeout time.Duration) (*dns.Msg, error) {
 	// First, try UDP (fast path)
 	if p.udp != nil {
-		resp, err := p.udp.Exchange(q, defaultQueryTimeout)
+		resp, err := p.udp.Exchange(q, timeout)
 		if err == nil && resp != nil && !resp.Truncated {
 			return resp, nil
 		}
@@ -233,7 +231,7 @@ func (p *UpstreamPool) Exchange(q *dns.Msg, timeout time.Duration) (*dns.Msg, er
 
 	// wrap with dns.Conn for framing (length-prefix) and convenience
 	dnsConn := &dns.Conn{Conn: tcpConn}
-	if err := tcpConn.SetDeadline(time.Now().Add(defaultQueryTimeout)); err != nil {
+	if err := tcpConn.SetDeadline(time.Now().Add(timeout)); err != nil {
 		return nil, err
 	}
 
