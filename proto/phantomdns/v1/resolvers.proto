@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package phantomdns.v1;
+
+option go_package = "github.com/lopster568/phantomDNS/internal/gen/proto/phantomdns/v1;v1";
+
+// DataPlaneReporterService receives periodic runtime status reports
+// from dataplane instances. The dataplane pushes factual runtime
+// observations; the controlplane does not make inline decisions here.
+service DataPlaneReporterService {
+  // ReportResolverStatus submits the current resolver runtime state
+  // observed by a dataplane instance.
+  rpc ReportResolverStatus (ResolverStatusReport)
+      returns (ReportAck);
+}
+
+// ResolverStatusReport represents a snapshot of resolver health
+// and performance as observed by a single dataplane instance.
+message ResolverStatusReport {
+  // Unique identifier of the dataplane instance sending this report.
+  string dataplane_id = 1;
+
+  // Unix timestamp (seconds) when the snapshot was generated.
+  int64 timestamp_unix = 2;
+
+  // Status information for all resolvers known to the dataplane.
+  repeated ResolverStatus resolvers = 3;
+}
+
+// ResolverStatus describes the runtime health and performance
+// characteristics of a single upstream resolver.
+message ResolverStatus {
+  // Stable identifier of the resolver (matches DB resolver ID).
+  string resolver_id = 1;
+
+  // Indicates whether the resolver is currently considered healthy.
+  bool healthy = 2;
+
+  // Rolling average latency in milliseconds for successful queries.
+  uint32 avg_latency_ms = 3;
+
+  // Most recent error message observed when querying the resolver.
+  // Empty if no recent error has occurred.
+  string last_error = 4;
+
+  // Unix timestamp (seconds) of the last successful query.
+  int64 last_success_unix = 5;
+}
+
+// ReportAck acknowledges receipt of a resolver status report.
+message ReportAck {
+  // Indicates whether the report was accepted and processed.
+  bool accepted = 1;
+}

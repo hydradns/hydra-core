@@ -18,6 +18,7 @@ type ManagedResolver struct {
 	meta  models.UpstreamResolver
 	pool  *UpstreamPool
 	state atomic.Value // healthy / degraded / down
+	stats ResolverRuntimeStats
 }
 
 type UpstreamManager struct {
@@ -31,6 +32,22 @@ const (
 	StateDegraded ResolverState = "degraded"
 	StateDown     ResolverState = "down"
 )
+
+type ResolverSnapshot struct {
+	ID           string
+	Healthy      bool
+	AvgLatencyMs uint32
+	LastError    string
+	LastSuccess  time.Time
+}
+
+type ResolverRuntimeStats struct {
+	lastLatencyMs atomic.Uint32
+	lastSuccess   atomic.Int64 // unix seconds
+	lastError     atomic.Value // string
+	successCount  atomic.Uint64
+	errorCount    atomic.Uint64
+}
 
 // NewUpstreamManager builds a pool for each configured resolver
 func NewUpstreamManager(resolvers []models.UpstreamResolver, poolSize int) (*UpstreamManager, error) {
@@ -78,7 +95,19 @@ func (m *UpstreamManager) Exchange(q *dns.Msg, timeout time.Duration, maxRetries
 		}
 
 		for attempt := 0; attempt < maxRetries; attempt++ {
+			start := time.Now()
 			resp, err := r.pool.Exchange(q, timeout)
+			elapsed := time.Since(start)
+
+			if err == nil {
+				r.stats.lastLatencyMs.Store(uint32(elapsed.Milliseconds()))
+				r.stats.lastSuccess.Store(time.Now().Unix())
+				r.stats.successCount.Add(1)
+				r.stats.lastError.Store("")
+			} else {
+				r.stats.errorCount.Add(1)
+				r.stats.lastError.Store(err.Error())
+			}
 			if err == nil {
 				return resp, nil
 			}
@@ -98,4 +127,37 @@ func (m *UpstreamManager) Exchange(q *dns.Msg, timeout time.Duration, maxRetries
 	}
 
 	return nil, lastErr
+}
+
+func (r *ManagedResolver) IsHealthy() bool {
+	lastSuccess := r.stats.lastSuccess.Load()
+	if lastSuccess == 0 {
+		return false
+	}
+	return time.Since(time.Unix(lastSuccess, 0)) < 30*time.Second
+}
+
+func (m *UpstreamManager) Snapshot() []ResolverSnapshot {
+	out := make([]ResolverSnapshot, 0, len(m.resolvers))
+
+	for _, r := range m.resolvers {
+		lastSuccessUnix := r.stats.lastSuccess.Load()
+
+		out = append(out, ResolverSnapshot{
+			ID:           r.meta.ID,
+			Healthy:      r.IsHealthy(),
+			AvgLatencyMs: r.stats.lastLatencyMs.Load(),
+			LastError:    loadString(r.stats.lastError),
+			LastSuccess:  time.Unix(lastSuccessUnix, 0),
+		})
+	}
+
+	return out
+}
+
+func loadString(v atomic.Value) string {
+	if s, ok := v.Load().(string); ok {
+		return s
+	}
+	return ""
 }

@@ -162,3 +162,10 @@ func (e *Engine) ProcessDNSQuery(w dns.ResponseWriter, r *dns.Msg) {
 func (e *Engine) Metrics() *metrics.QueryMetrics {
 	return e.metrics
 }
+
+func (e *Engine) ResolverSnapshot() []ResolverSnapshot {
+	if e.upstreamManager == nil {
+		return nil
+	}
+	return e.upstreamManager.Snapshot()
+}
