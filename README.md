@@ -1,4 +1,4 @@
-# PhantomDNS 🛡️
+# HydraDNS 🛡️
 
 Hactober Prerequisites
 
@@ -11,8 +11,8 @@ Hactober Prerequisites
 1. **Clone the repository:**
 
    ```sh
-   git clone https://github.com/lopster568/PhantomDNS.git
-   cd PhantomDNS
+   git clone https://github.com/lopster568/HydraDNS.git
+   cd HydraDNS
    ```
 
 2. **Configure the environment** (optional):
@@ -32,7 +32,7 @@ Hactober Prerequisites
 
 ## 🔧 Usage
 
-Once running, PhantomDNS provides two main services:
+Once running, HydraDNS provides two main services:
 
 ### Data Plane (DNS Server)
 
@@ -49,7 +49,7 @@ Once running, PhantomDNS provides two main services:
 [![License](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](./LICENSE)
 [![Contributors Welcome](https://img.shields.io/badge/contributors-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
-PhantomDNS is a powerful DNS-layer security & privacy gateway designed to protect your network from threats while maintaining your privacy. Whether you're running it on a Raspberry Pi at home or deploying it in the cloud, PhantomDNS has got you covered.
+HydraDNS is a powerful DNS-layer security & privacy gateway designed to protect your network from threats while maintaining your privacy. Whether you're running it on a Raspberry Pi at home or deploying it in the cloud, HydraDNS has got you covered.
 
 ## ✨ Features
 
@@ -62,7 +62,7 @@ PhantomDNS is a powerful DNS-layer security & privacy gateway designed to protec
 
 ## 🏗️ Architecture
 
-PhantomDNS uses a microservices architecture with two main components:
+HydraDNS uses a microservices architecture with two main components:
 
 1. **Data Plane**: The core DNS server handling queries (port 1053)
 2. **Control Plane**: Administrative API for configuration (port 8086)
@@ -74,8 +74,8 @@ Note: A file is not just code, it is a concept; and nothing should break the con
 1.  **Clone the repository:**
 
     ```sh
-    git clone https://github.com/lopster568/PhantomDNS.git
-    cd PhantomDNS
+    git clone https://github.com/lopster568/HydraDNS.git
+    cd HydraDNS
     ```
 
 2.  **Build and run the services using Docker Compose:**
@@ -143,12 +143,12 @@ Look for issues tagged with `good-first-issue` - these are perfect for newcomers
 
 ## 📝 License
 
-PhantomDNS CE is licensed under the GNU General Public License v3.0 (GPLv3).  
+HydraDNS CE is licensed under the GNU General Public License v3.0 (GPLv3).  
 See the [LICENSE](./LICENSE) file for details.
 
 ## ⭐ Show Your Support
 
-If you find PhantomDNS useful, please consider:
+If you find HydraDNS useful, please consider:
 
 - Giving us a star on GitHub
 - Contributing to the project
@@ -156,4 +156,4 @@ If you find PhantomDNS useful, please consider:
 
 ---
 
-Built with ❤️ by the PhantomDNS community
+Built with ❤️ by the HydraDNS community
