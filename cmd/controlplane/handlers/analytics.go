@@ -7,80 +7,92 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// QueryTrendItem represents a single query trend data point
-type QueryTrendItem struct {
-	Hour    string `json:"hour"`
-	Queries int    `json:"queries"`
+type QueryLogEntry struct {
+	ID              uint      `json:"id"`
+	Domain          string    `json:"domain"`
+	ClientIP        string    `json:"client_ip"`
+	Action          string    `json:"action"`
+	Timestamp       time.Time `json:"timestamp"`
+	IsSuspicious    bool      `json:"is_suspicious"`
+	ThreatScore     float64   `json:"threat_score"`
+	DetectionMethod string    `json:"detection_method,omitempty"`
+	ThreatReason    string    `json:"threat_reason,omitempty"`
 }
 
-// AnalyticsSummaryData represents analytics summary metrics
 type AnalyticsSummaryData struct {
-	TotalQueries     int              `json:"total_queries"`
-	AvgQueryTimeMs   float64          `json:"avg_query_time_ms"`
-	BlockRatePercent float64          `json:"block_rate_percent"`
-	CacheHitPercent  float64          `json:"cache_hit_percent"`
-	QueryTrend24h    []QueryTrendItem `json:"query_trend_24h"`
+	TotalQueries     uint64  `json:"total_queries"`
+	BlockedQueries   uint64  `json:"blocked_queries"`
+	AllowedQueries   uint64  `json:"allowed_queries"`
+	BlockRatePercent float64 `json:"block_rate_percent"`
 }
 
-// ResponseAnalyticsSummary represents analytics summary response
 type ResponseAnalyticsSummary struct {
 	Status string               `json:"status"`
 	Data   AnalyticsSummaryData `json:"data"`
 	Error  *string              `json:"error"`
 }
 
-// AuditLogEntry represents a single audit log entry
-type AuditLogEntry struct {
-	Timestamp time.Time `json:"timestamp"`
-	Action    string    `json:"action"`
-	Entity    string    `json:"entity"`
-	User      string    `json:"user"`
-}
-
-// ResponseAuditList represents audit logs response
-type ResponseAuditList struct {
+type ResponseQueryLogList struct {
 	Status string          `json:"status"`
-	Data   []AuditLogEntry `json:"data"`
+	Data   []QueryLogEntry `json:"data"`
 	Error  *string         `json:"error"`
 }
 
 // GetAnalyticsSummary handles GET /analytics/summary
 func (h *APIHandler) GetAnalyticsSummary(c *gin.Context) {
-	// TODO: Implement logic to fetch analytics from database
+	stats, err := h.Store.Statistics.ListRecent(1)
+	if err != nil || len(stats) == 0 {
+		c.JSON(http.StatusOK, ResponseAnalyticsSummary{
+			Status: "success",
+			Data:   AnalyticsSummaryData{},
+		})
+		return
+	}
+
+	s := stats[0]
+	var blockRate float64
+	if s.TotalQueries > 0 {
+		blockRate = float64(s.BlockedQueries) / float64(s.TotalQueries) * 100
+	}
+
 	c.JSON(http.StatusOK, ResponseAnalyticsSummary{
 		Status: "success",
 		Data: AnalyticsSummaryData{
-			TotalQueries:     125000,
-			AvgQueryTimeMs:   12.3,
-			BlockRatePercent: 2.56,
-			CacheHitPercent:  78.5,
-			QueryTrend24h: []QueryTrendItem{
-				{Hour: "00:00", Queries: 5000},
-				{Hour: "01:00", Queries: 4500},
-				{Hour: "02:00", Queries: 4200},
-				{Hour: "03:00", Queries: 4000},
-				{Hour: "04:00", Queries: 4100},
-				{Hour: "05:00", Queries: 4800},
-				{Hour: "06:00", Queries: 6200},
-				{Hour: "07:00", Queries: 7500},
-				{Hour: "08:00", Queries: 8900},
-				{Hour: "09:00", Queries: 9500},
-			},
+			TotalQueries:     s.TotalQueries,
+			BlockedQueries:   s.BlockedQueries,
+			AllowedQueries:   s.AllowedQueries,
+			BlockRatePercent: blockRate,
 		},
-		Error: nil,
 	})
 }
 
 // GetAuditLogs handles GET /analytics/audits
+// Returns recent DNS query logs as the audit trail.
 func (h *APIHandler) GetAuditLogs(c *gin.Context) {
-	// TODO: Implement logic to fetch audit logs from database
-	c.JSON(http.StatusOK, ResponseAuditList{
+	queries, err := h.Store.QueryLogs.ListRecent(100)
+	if err != nil {
+		errMsg := "failed to fetch query logs"
+		c.JSON(http.StatusInternalServerError, ResponseQueryLogList{Status: "error", Error: &errMsg})
+		return
+	}
+
+	entries := make([]QueryLogEntry, 0, len(queries))
+	for _, q := range queries {
+		entries = append(entries, QueryLogEntry{
+			ID:              q.ID,
+			Domain:          q.Domain,
+			ClientIP:        q.ClientIP,
+			Action:          q.Action,
+			Timestamp:       q.Timestamp,
+			IsSuspicious:    q.IsSuspicious,
+			ThreatScore:     q.ThreatScore,
+			DetectionMethod: q.DetectionMethod,
+			ThreatReason:    q.ThreatReason,
+		})
+	}
+
+	c.JSON(http.StatusOK, ResponseQueryLogList{
 		Status: "success",
-		Data: []AuditLogEntry{
-			{Timestamp: time.Now().Add(-1 * time.Hour), Action: "create", Entity: "policy", User: "system"},
-			{Timestamp: time.Now().Add(-2 * time.Hour), Action: "update", Entity: "blocklist", User: "system"},
-			{Timestamp: time.Now().Add(-3 * time.Hour), Action: "delete", Entity: "resolver", User: "system"},
-		},
-		Error: nil,
+		Data:   entries,
 	})
 }

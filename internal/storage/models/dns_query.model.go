@@ -4,9 +4,13 @@ package models
 import "time"
 
 type DNSQuery struct {
-	ID        uint      `gorm:"primaryKey"`
-	Domain    string    `gorm:"index;not null;"`
-	ClientIP  string    `gorm:"index;not null;"`
-	Action    string    `gorm:"not null;"` //allow, block, log
-	Timestamp time.Time `gorm:"index;"`
+	ID              uint      `gorm:"primaryKey"`
+	Domain          string    `gorm:"index;not null;"`
+	ClientIP        string    `gorm:"index;not null;"`
+	Action          string    `gorm:"not null;"` // allow, block, redirect, flagged
+	Timestamp       time.Time `gorm:"index;"`
+	IsSuspicious    bool      `gorm:"default:false"`
+	ThreatScore     float64   `gorm:"default:0"`
+	DetectionMethod string    `gorm:"default:''"`
+	ThreatReason    string    `gorm:"default:''"`
 }

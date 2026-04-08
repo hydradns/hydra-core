@@ -10,6 +10,14 @@ func RegisterRoutes(r *gin.Engine, apiHandler *handlers.APIHandler) {
 	r.GET("/health", apiHandler.HealthCheck)
 	r.GET("/", apiHandler.Root)
 	{
+		// Auth endpoints (unprotected — middleware exempts these paths)
+		auth := api.Group("/auth")
+		{
+			auth.GET("/status", apiHandler.GetAuthStatus)
+			auth.POST("/setup", apiHandler.Setup)
+			auth.POST("/login", apiHandler.Login)
+		}
+
 		// Dashboard endpoints
 		dashboard := api.Group("/dashboard")
 		{
@@ -23,8 +31,6 @@ func RegisterRoutes(r *gin.Engine, apiHandler *handlers.APIHandler) {
 			dns.POST("/engine", apiHandler.ToggleDnsEngine)
 			dns.GET("/resolvers", apiHandler.ListResolvers)
 			dns.GET("/metrics", apiHandler.GetDnsMetrics)
-			dns.POST("/resolvers", apiHandler.AddResolver)
-			dns.DELETE("/resolvers/:id", apiHandler.DeleteResolver)
 		}
 
 		// Policies endpoints

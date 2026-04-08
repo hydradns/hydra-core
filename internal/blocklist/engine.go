@@ -72,6 +72,9 @@ func (m *Engine) UpdateSource(ctx context.Context, src models.BlocklistSource, k
 	// Compute checksum for version tracking
 	checksum := hash(body)
 
+	// Persist ETag for future conditional requests
+	src.ETag = etag
+
 	// Save atomically to DB (snapshot + entries)
 	snapshot, err := m.repo.SaveSnapshotWithEntries(src, checksum, entries)
 	if err != nil {

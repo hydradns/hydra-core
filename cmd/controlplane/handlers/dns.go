@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lopster568/phantomDNS/internal/config"
 )
 
 // DnsEngineStatusData represents DNS engine status
@@ -37,21 +39,9 @@ type ResponseResolverList struct {
 	Error  *string    `json:"error"`
 }
 
-// ResponseResolverSingle represents a single resolver response
-type ResponseResolverSingle struct {
-	Status string   `json:"status"`
-	Data   Resolver `json:"data"`
-	Error  *string  `json:"error"`
-}
-
 // ToggleDnsEngineRequest represents request to toggle DNS engine
 type ToggleDnsEngineRequest struct {
 	Enabled bool `json:"enabled"`
-}
-
-var mockResolvers = []Resolver{
-	{ID: "1", Name: "Google DNS", Address: "8.8.8.8", Protocol: "udp"},
-	{ID: "2", Name: "Cloudflare DNS", Address: "1.1.1.1", Protocol: "udp"},
 }
 
 // GetDnsEngineStatus handles GET /dns/engine
@@ -193,55 +183,21 @@ func (h *APIHandler) ToggleDnsEngine(c *gin.Context) {
 }
 
 // ListResolvers handles GET /dns/resolvers
+// Returns the upstream resolvers from the config file.
 func (h *APIHandler) ListResolvers(c *gin.Context) {
-	// TODO: Implement logic to fetch resolvers from dataplane
-	c.JSON(http.StatusOK, ResponseResolverList{
-		Status: "success",
-		Data:   mockResolvers,
-		Error:  nil,
-	})
-}
-
-// AddResolver handles POST /dns/resolvers
-func (h *APIHandler) AddResolver(c *gin.Context) {
-	var resolver Resolver
-	if err := c.ShouldBindJSON(&resolver); err != nil {
-		errMsg := err.Error()
-		c.JSON(http.StatusBadRequest, ResponseResolverSingle{
-			Status: "error",
-			Data:   Resolver{},
-			Error:  &errMsg,
-		})
-		return
-	}
-	// TODO: Implement logic to add resolver via gRPC
-	mockResolvers = append(mockResolvers, resolver)
-	c.JSON(http.StatusCreated, ResponseResolverSingle{
-		Status: "success",
-		Data:   resolver,
-		Error:  nil,
-	})
-}
-
-// DeleteResolver handles DELETE /dns/resolvers/:id
-func (h *APIHandler) DeleteResolver(c *gin.Context) {
-	id := c.Param("id")
-	// TODO: Implement logic to delete resolver via gRPC
-	for i, resolver := range mockResolvers {
-		if resolver.ID == id {
-			mockResolvers = append(mockResolvers[:i], mockResolvers[i+1:]...)
-			c.JSON(http.StatusOK, ResponseGeneric{
-				Status: "success",
-				Data:   map[string]interface{}{},
-				Error:  nil,
+	var resolvers []Resolver
+	if config.DefaultConfig != nil {
+		for i, addr := range config.DefaultConfig.DataPlane.UpstreamResolvers {
+			resolvers = append(resolvers, Resolver{
+				ID:       fmt.Sprintf("%d", i+1),
+				Name:     addr,
+				Address:  addr,
+				Protocol: "udp",
 			})
-			return
 		}
 	}
-	errMsg := "resolver not found"
-	c.JSON(http.StatusNotFound, ResponseGeneric{
-		Status: "error",
-		Data:   nil,
-		Error:  &errMsg,
+	c.JSON(http.StatusOK, ResponseResolverList{
+		Status: "success",
+		Data:   resolvers,
 	})
 }

@@ -19,29 +19,63 @@ type GRPCServerConfig struct {
 }
 
 type DataPlaneConfig struct {
-	ListenAddr        string           `yaml:"listen_addr"`
-	UpstreamResolvers []string         `yaml:"upstream_resolvers"`
-	GRPCServer        GRPCServerConfig `yaml:"grpc_server"`
+	ListenAddr              string           `yaml:"listen_addr"`
+	UpstreamResolvers       []string         `yaml:"upstream_resolvers"`
+	GRPCServer              GRPCServerConfig `yaml:"grpc_server"`
+	BlocklistUpdateInterval string           `yaml:"blocklist_update_interval"`
 }
 
 type ControlPlaneConfig struct {
 	ListenAddr string `yaml:"listen_addr"`
 }
 
+func defaultConfig() *Config {
+	return &Config{
+		DataPlane: DataPlaneConfig{
+			ListenAddr:              "0.0.0.0:1053",
+			UpstreamResolvers:       []string{"8.8.8.8:53", "1.1.1.1:53"},
+			BlocklistUpdateInterval: "6h",
+			GRPCServer: GRPCServerConfig{
+				Port:       50051,
+				ListenAddr: "localhost:50051",
+			},
+		},
+		ControlPlane: ControlPlaneConfig{
+			ListenAddr: "0.0.0.0:8080",
+		},
+	}
+}
+
 func loadConfig(path string) *Config {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		logger.Log.Error("Failed to read config file: " + err.Error())
-		return nil
+		logger.Log.Warnf("Config file not found (%s), using defaults", path)
+		return defaultConfig()
 	}
 
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		logger.Log.Error("Failed to unmarshal config: " + err.Error())
-		return nil
+		logger.Log.Errorf("Failed to unmarshal config: %v, using defaults", err)
+		return defaultConfig()
 	}
 
 	return &cfg
 }
 
-var DefaultConfig = loadConfig("/app/configs/config.yaml")
+var DefaultConfig = func() *Config {
+	cfg := loadConfig(configPath())
+	if addr := os.Getenv("DNS_LISTEN_ADDR"); addr != "" {
+		cfg.DataPlane.ListenAddr = addr
+	}
+	if interval := os.Getenv("BLOCKLIST_UPDATE_INTERVAL"); interval != "" {
+		cfg.DataPlane.BlocklistUpdateInterval = interval
+	}
+	return cfg
+}()
+
+func configPath() string {
+	if p := os.Getenv("PHANTOM_CONFIG"); p != "" {
+		return p
+	}
+	return "/app/configs/config.yaml"
+}

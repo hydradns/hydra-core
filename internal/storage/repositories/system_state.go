@@ -32,8 +32,8 @@ func (r *SystemStateRepo) Get() (*models.SystemState, error) {
 	if err == gorm.ErrRecordNotFound {
 		state = models.SystemState{
 			ID:            1,
-			DNSEnabled:    false,
-			PolicyEnabled: false,
+			DNSEnabled:    true,
+			PolicyEnabled: true,
 			UpdatedAt:     time.Now(),
 		}
 		if err := r.db.Create(&state).Error; err != nil {

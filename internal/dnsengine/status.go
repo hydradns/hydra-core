@@ -10,7 +10,9 @@ type Status struct {
 func (e *Engine) Status() Status {
 	var lastErr string
 	if v := e.state.lastError.Load(); v != nil {
-		lastErr = v.(string)
+		if s, ok := v.(string); ok {
+			lastErr = s
+		}
 	}
 
 	return Status{

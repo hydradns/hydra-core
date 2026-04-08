@@ -3,6 +3,7 @@ package main
 
 import (
 	"log"
+	"os"
 
 	"github.com/lopster568/phantomDNS/cmd/controlplane/handlers"
 	"github.com/lopster568/phantomDNS/cmd/controlplane/middlewares"
@@ -17,7 +18,11 @@ import (
 
 func main() {
 	// Initialize database
-	db.InitDB("/app/data/phantomdns.db")
+	dbPath := "/app/data/phantomdns.db"
+	if p := os.Getenv("PHANTOM_DB"); p != "" {
+		dbPath = p
+	}
+	db.InitDB(dbPath)
 	repos := repositories.NewStore(db.DB)
 
 	// Initialize grpc client
@@ -41,6 +46,9 @@ func main() {
 
 	// CORS middleware (development-friendly). See cmd/controlplane/middlewares/cors.go
 	r.Use(middlewares.CORS())
+
+	// Auth middleware — validates Bearer token on protected routes
+	r.Use(middlewares.Auth(repos.Auth))
 
 	routes.RegisterRoutes(r, apiHandler)
 	r.Run(config.DefaultConfig.ControlPlane.ListenAddr)

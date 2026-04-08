@@ -22,7 +22,7 @@ RUN if [ -f proto/health.proto ]; then \
 RUN go build -o controlplane ./cmd/controlplane
 
 # Final runtime image
-FROM alpine:latest
+FROM alpine:3.20
 WORKDIR /app
 COPY --from=builder /app/controlplane .
 

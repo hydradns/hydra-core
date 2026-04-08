@@ -51,5 +51,9 @@ func migrate(db *gorm.DB) error {
 		&models.Category{},
 		&models.Statistics{},
 		&models.SystemState{},
+		&models.BlocklistSource{},
+		&models.BlocklistSnapshot{},
+		&models.BlocklistEntry{},
+		&models.AdminCredential{},
 	)
 }

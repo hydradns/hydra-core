@@ -3,6 +3,8 @@ package main
 // SPDX-License-Identifier: GPL-3.0-or-later
 import (
 	"context"
+	"encoding/json"
+	"os"
 	"time"
 
 	"github.com/lopster568/phantomDNS/internal/blocklist"
@@ -18,64 +20,73 @@ import (
 
 func main() {
 	logger.Log.Info("Starting PhantomDNS Data Plane...")
-	logger.Log.Info("Built at ", time.Now().Format(time.RFC3339))
+
 	// 1. Initialize DB
-	db.InitDB("/app/data/phantomdns.db")
-	// 2. Initialize Repositories (store)
+	dbPath := "/app/data/phantomdns.db"
+	if p := os.Getenv("PHANTOM_DB"); p != "" {
+		dbPath = p
+	}
+	db.InitDB(dbPath)
+
+	// 2. Initialize Repositories
 	repos := repositories.NewStore(db.DB)
-	// 2.1 Blocklist Engine
+
+	// 3. Blocklist Engine — load from DB sources, refresh periodically
 	blEngine := blocklist.NewEngine(repos.Blocklist)
-	// 4. Create a fake blocklist source (can be a small plain-text domain list)
-	src := models.BlocklistSource{
-		ID:        "test-source",
-		Name:      "StevenBlack Blocklist",
-		URL:       "https://raw.githubusercontent.com/StevenBlack/hosts/master/data/StevenBlack/hosts", // or your own small text list
-		Format:    "hosts",                                                                             // must match a parser in your system
-		Category:  "test",
-		Enabled:   true,
-		CreatedAt: time.Now(),
+
+	// Initial load in background so DNS starts immediately
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		refreshBlocklists(ctx, blEngine, repos.Blocklist)
+	}()
+
+	// Periodic refresh
+	interval, err := time.ParseDuration(config.DefaultConfig.DataPlane.BlocklistUpdateInterval)
+	if err != nil || interval == 0 {
+		interval = 6 * time.Hour
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	// 5. Run single-source update
-	if err := blEngine.UpdateSource(ctx, src, ""); err != nil {
-		logger.Log.Fatalf("Smoke test failed: %v", err)
-	}
-
-	logger.Log.Info("Blocklist fetch/parse/store successful, plus stored in DB.")
-
-	logger.Log.Info("Dumping first few blocklisted hosts for verification...")
-	hosts, err := blEngine.List()
-	if err != nil {
-		logger.Log.Fatalf("failed to list blocklist entries: %v", err)
-	}
-	for i, h := range hosts {
-		if i >= 10 {
-			break
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for range ticker.C {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+			refreshBlocklists(ctx, blEngine, repos.Blocklist)
+			cancel()
 		}
-		logger.Log.Infof("Blocklisted: %s", h)
-	}
-	logger.Log.Infof("Initializing DNS server policies")
-	// 3. Initialize Policy Engine
+	}()
+
+	// 4. Initialize Policy Engine — load from file + DB
 	policyEngine := policy.NewPolicyEngine()
-	policies, err := policy.LoadPoliciesFromFile("/app/configs/policies.json")
+	policiesPath := "/app/configs/policies.json"
+	if p := os.Getenv("PHANTOM_POLICIES"); p != "" {
+		policiesPath = p
+	}
+	filePolicies, err := policy.LoadPoliciesFromFile(policiesPath)
 	if err != nil {
-		logger.Log.Fatalf("failed to load policies from file: %v", err)
+		logger.Log.Warnf("failed to load policies from file: %v (continuing with DB policies only)", err)
+		filePolicies = nil
 	}
-	if err := policyEngine.LoadPolicies(policies); err != nil {
-		logger.Log.Fatalf("failed to load snapshot: %v", err)
-	}
-	logger.Log.Infof("Initializing DNS server engine")
-	// 4. Initialize DNS Engine with default config and repos
+
+	// Merge file policies + DB policies
+	reloadPolicies(policyEngine, filePolicies, repos.Policies)
+
+	// Poll DB for policy changes every 5 seconds
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			reloadPolicies(policyEngine, filePolicies, repos.Policies)
+		}
+	}()
+
+	// 5. Initialize DNS Engine
 	engine, err := dnsengine.NewDNSEngine(config.DefaultConfig.DataPlane, repos, policyEngine)
 	if err != nil {
 		logger.Log.Fatal("Failed to create DNS engine: " + err.Error())
 	}
 
-	logger.Log.Infof("Initializing GRPC server for health checks and metrics")
-	// 6. GRPC server for health checks and metrics can be added here
+	// 6. gRPC server
 	statusService := dataplanegrpc.NewStatusService(engine)
 	metricsService := dataplanegrpc.NewMetricsService(engine)
 	grpcSrv := dataplanegrpc.New(config.DefaultConfig.DataPlane.GRPCServer.Port, statusService, metricsService)
@@ -87,11 +98,8 @@ func main() {
 		}
 	}()
 
-	logger.Log.Infof("Attaching blocklist checker to DNS engine")
-	// 4.1 Attach blocklist checker to DNS engine
+	// 7. Attach blocklist checker and start DNS server
 	engine.AttachBlocklistChecker(repos.Blocklist)
-	// 5. Initialize and Run Server with the engine
-	logger.Log.Infof("Initializing DNS server")
 	srv, err := dnsengine.NewServer(config.DefaultConfig.DataPlane, engine)
 	if err != nil {
 		logger.Log.Fatal("Failed to create server: " + err.Error())
@@ -99,4 +107,63 @@ func main() {
 
 	logger.Log.Infof("DNS server listening on %s", config.DefaultConfig.DataPlane.ListenAddr)
 	srv.Run()
+}
+
+func refreshBlocklists(ctx context.Context, engine *blocklist.Engine, repo repositories.BlocklistRepository) {
+	sources, err := repo.ListSources()
+	if err != nil {
+		logger.Log.Errorf("Failed to list blocklist sources: %v", err)
+		return
+	}
+	if len(sources) == 0 {
+		logger.Log.Info("No blocklist sources configured")
+		return
+	}
+	for _, src := range sources {
+		if !src.Enabled {
+			continue
+		}
+		if err := engine.UpdateSource(ctx, src, src.ETag); err != nil {
+			logger.Log.Errorf("Blocklist update failed for %s: %v", src.Name, err)
+		}
+	}
+	count, _ := engine.List()
+	logger.Log.Infof("Blocklist refresh complete: %d total domains blocked", len(count))
+}
+
+func reloadPolicies(engine *policy.Engine, filePolicies []policy.Policy, repo repositories.PolicyRepository) {
+	// Start with file-based policies
+	all := make([]policy.Policy, len(filePolicies))
+	copy(all, filePolicies)
+
+	// Add DB policies
+	dbPolicies, err := repo.List()
+	if err != nil {
+		logger.Log.Errorf("Failed to load policies from DB: %v", err)
+	} else {
+		for _, dbp := range dbPolicies {
+			all = append(all, dbPolicyToEngine(dbp))
+		}
+	}
+
+	if err := engine.LoadPolicies(all); err != nil {
+		logger.Log.Errorf("Failed to reload policy snapshot: %v", err)
+	}
+}
+
+func dbPolicyToEngine(m models.Policy) policy.Policy {
+	var domains []string
+	if m.Domains != "" {
+		_ = json.Unmarshal([]byte(m.Domains), &domains)
+	}
+	return policy.Policy{
+		ID:       m.ID,
+		Name:     m.Name,
+		Action:   m.Action,
+		Domains:  domains,
+		Priority: m.Priority,
+		Enabled:  m.Enabled,
+		Category: m.Category,
+		Redirect: m.RedirectIP,
+	}
 }

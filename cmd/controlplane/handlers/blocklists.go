@@ -2,136 +2,148 @@ package handlers
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lopster568/phantomDNS/internal/storage/models"
 )
 
-// Blocklist represents a blocklist entry
+// Blocklist represents a blocklist source in API responses
 type Blocklist struct {
-	ID                string `json:"id"`
-	Name              string `json:"name"`
-	Category          string `json:"category"`
-	DomainsCount      int    `json:"domains_count"`
-	AvgBlockedQueries int    `json:"avg_blocked_queries"`
-	Active            bool   `json:"active"`
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	URL          string    `json:"url"`
+	Format       string    `json:"format"`
+	Category     string    `json:"category"`
+	DomainsCount int64     `json:"domains_count"`
+	Enabled      bool      `json:"enabled"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
-// BlocklistListData represents blocklist list data with statistics
 type BlocklistListData struct {
-	TotalBlocklists   int         `json:"total_blocklists"`
-	TotalDomains      int         `json:"total_domains"`
-	AvgBlockedQueries float64     `json:"avg_blocked_queries"`
-	ActiveLists       []Blocklist `json:"active_lists"`
+	TotalBlocklists int         `json:"total_blocklists"`
+	TotalDomains    int64       `json:"total_domains"`
+	ActiveLists     []Blocklist `json:"active_lists"`
 }
 
-// ResponseBlocklistList represents a list of blocklists response
 type ResponseBlocklistList struct {
 	Status string            `json:"status"`
 	Data   BlocklistListData `json:"data"`
 	Error  *string           `json:"error"`
 }
 
-// ResponseBlocklistSingle represents a single blocklist entry response
 type ResponseBlocklistSingle struct {
 	Status string    `json:"status"`
 	Data   Blocklist `json:"data"`
 	Error  *string   `json:"error"`
 }
 
-var mockBlocklists = []Blocklist{
-	{ID: "1", Name: "Ads Block", Category: "ads", DomainsCount: 10000, AvgBlockedQueries: 1500, Active: true},
-	{ID: "2", Name: "Malware Block", Category: "malware", DomainsCount: 5000, AvgBlockedQueries: 1200, Active: true},
-	{ID: "3", Name: "Tracking Block", Category: "tracking", DomainsCount: 3000, AvgBlockedQueries: 500, Active: true},
+type CreateBlocklistRequest struct {
+	ID       string `json:"id" binding:"required"`
+	Name     string `json:"name" binding:"required"`
+	URL      string `json:"url" binding:"required"`
+	Format   string `json:"format" binding:"required"`
+	Category string `json:"category"`
+}
+
+func blocklistFromSource(src models.BlocklistSource, count int64) Blocklist {
+	return Blocklist{
+		ID:           src.ID,
+		Name:         src.Name,
+		URL:          src.URL,
+		Format:       src.Format,
+		Category:     src.Category,
+		DomainsCount: count,
+		Enabled:      src.Enabled,
+		CreatedAt:    src.CreatedAt,
+		UpdatedAt:    src.UpdatedAt,
+	}
 }
 
 // ListBlocklists handles GET /blocklists
 func (h *APIHandler) ListBlocklists(c *gin.Context) {
-	// TODO: Implement logic to fetch blocklists from database
-	totalDomains := 0
-	totalBlocked := 0
-	for _, bl := range mockBlocklists {
-		totalDomains += bl.DomainsCount
-		totalBlocked += bl.AvgBlockedQueries
+	sources, err := h.Store.Blocklist.ListSources()
+	if err != nil {
+		errMsg := "failed to fetch blocklist sources"
+		c.JSON(http.StatusInternalServerError, ResponseBlocklistList{Status: "error", Error: &errMsg})
+		return
 	}
-	avgBlocked := 0.0
-	if len(mockBlocklists) > 0 {
-		avgBlocked = float64(totalBlocked) / float64(len(mockBlocklists))
+
+	counts, err := h.Store.Blocklist.CountEntriesGroupedBySource()
+	if err != nil {
+		counts = map[string]int64{}
+	}
+
+	var lists []Blocklist
+	var totalDomains int64
+	for _, src := range sources {
+		count := counts[src.ID]
+		totalDomains += count
+		lists = append(lists, blocklistFromSource(src, count))
 	}
 
 	c.JSON(http.StatusOK, ResponseBlocklistList{
 		Status: "success",
 		Data: BlocklistListData{
-			TotalBlocklists:   len(mockBlocklists),
-			TotalDomains:      totalDomains,
-			AvgBlockedQueries: avgBlocked,
-			ActiveLists:       mockBlocklists,
+			TotalBlocklists: len(lists),
+			TotalDomains:    totalDomains,
+			ActiveLists:     lists,
 		},
-		Error: nil,
 	})
 }
 
 // GetBlocklist handles GET /blocklists/:id
 func (h *APIHandler) GetBlocklist(c *gin.Context) {
-	id := c.Param("id")
-	// TODO: Implement logic to fetch blocklist from database
-	for _, blocklist := range mockBlocklists {
-		if blocklist.ID == id {
-			c.JSON(http.StatusOK, ResponseBlocklistSingle{
-				Status: "success",
-				Data:   blocklist,
-				Error:  nil,
-			})
-			return
-		}
+	src, err := h.Store.Blocklist.GetSource(c.Param("id"))
+	if err != nil {
+		errMsg := "blocklist not found"
+		c.JSON(http.StatusNotFound, ResponseBlocklistSingle{Status: "error", Error: &errMsg})
+		return
 	}
-	errMsg := "blocklist not found"
-	c.JSON(http.StatusNotFound, ResponseBlocklistSingle{
-		Status: "error",
-		Data:   Blocklist{},
-		Error:  &errMsg,
+	count, _ := h.Store.Blocklist.CountEntriesBySource(src.ID)
+	c.JSON(http.StatusOK, ResponseBlocklistSingle{
+		Status: "success",
+		Data:   blocklistFromSource(*src, count),
 	})
 }
 
 // CreateBlocklist handles POST /blocklists
 func (h *APIHandler) CreateBlocklist(c *gin.Context) {
-	var blocklist Blocklist
-	if err := c.ShouldBindJSON(&blocklist); err != nil {
+	var req CreateBlocklistRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
 		errMsg := err.Error()
-		c.JSON(http.StatusBadRequest, ResponseBlocklistSingle{
-			Status: "error",
-			Data:   Blocklist{},
-			Error:  &errMsg,
-		})
+		c.JSON(http.StatusBadRequest, ResponseBlocklistSingle{Status: "error", Error: &errMsg})
 		return
 	}
-	// TODO: Implement logic to add blocklist entry to database
-	mockBlocklists = append(mockBlocklists, blocklist)
+
+	src := &models.BlocklistSource{
+		ID:        req.ID,
+		Name:      req.Name,
+		URL:       req.URL,
+		Format:    req.Format,
+		Category:  req.Category,
+		Enabled:   true,
+		CreatedAt: time.Now(),
+	}
+	if err := h.Store.Blocklist.CreateSource(src); err != nil {
+		errMsg := "failed to create blocklist source"
+		c.JSON(http.StatusInternalServerError, ResponseBlocklistSingle{Status: "error", Error: &errMsg})
+		return
+	}
+
 	c.JSON(http.StatusCreated, ResponseBlocklistSingle{
 		Status: "success",
-		Data:   blocklist,
-		Error:  nil,
+		Data:   blocklistFromSource(*src, 0),
 	})
 }
 
 // DeleteBlocklist handles DELETE /blocklists/:id
 func (h *APIHandler) DeleteBlocklist(c *gin.Context) {
-	id := c.Param("id")
-	// TODO: Implement logic to delete blocklist from database
-	for i, blocklist := range mockBlocklists {
-		if blocklist.ID == id {
-			mockBlocklists = append(mockBlocklists[:i], mockBlocklists[i+1:]...)
-			c.JSON(http.StatusOK, ResponseGeneric{
-				Status: "success",
-				Data:   map[string]interface{}{},
-				Error:  nil,
-			})
-			return
-		}
+	if err := h.Store.Blocklist.DeleteSource(c.Param("id")); err != nil {
+		errMsg := "blocklist not found"
+		c.JSON(http.StatusNotFound, ResponseGeneric{Status: "error", Error: &errMsg})
+		return
 	}
-	errMsg := "blocklist not found"
-	c.JSON(http.StatusNotFound, ResponseGeneric{
-		Status: "error",
-		Data:   nil,
-		Error:  &errMsg,
-	})
+	c.JSON(http.StatusOK, ResponseGeneric{Status: "success", Data: map[string]interface{}{}})
 }
