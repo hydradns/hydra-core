@@ -32,26 +32,15 @@ func (e *Engine) Evaluate(domain string) (Decision, error) {
 	d := normalizeDomain(domain)
 	snap := e.snapshot.Load().(*PolicySnapshot)
 
-	// bloom negative short circuit
-	if snap.Bloom != nil && !snap.Bloom.TestString(d) {
-		return Decision{Action: ActionAllow}, nil
-	}
-
-	// exact-match
-	if pols, ok := snap.Exact[d]; ok && len(pols) > 0 {
-		best := pickHighestPriority(pols)
-		return policyDecision(best), nil
-	}
-
-	// subdomain match — walk up parent domains
-	// e.g., www.godaddy.com → godaddy.com → com
+	// Check exact match first, then walk up parent domains for subdomain matching.
+	// e.g., www.godaddy.com → check www.godaddy.com, then godaddy.com
 	parts := strings.Split(d, ".")
-	for i := 1; i < len(parts)-1; i++ {
-		parent := strings.Join(parts[i:], ".")
-		if snap.Bloom != nil && !snap.Bloom.TestString(parent) {
+	for i := 0; i < len(parts)-1; i++ {
+		candidate := strings.Join(parts[i:], ".")
+		if snap.Bloom != nil && !snap.Bloom.TestString(candidate) {
 			continue
 		}
-		if pols, ok := snap.Exact[parent]; ok && len(pols) > 0 {
+		if pols, ok := snap.Exact[candidate]; ok && len(pols) > 0 {
 			best := pickHighestPriority(pols)
 			return policyDecision(best), nil
 		}
