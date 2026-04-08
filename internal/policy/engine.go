@@ -43,6 +43,20 @@ func (e *Engine) Evaluate(domain string) (Decision, error) {
 		return policyDecision(best), nil
 	}
 
+	// subdomain match — walk up parent domains
+	// e.g., www.godaddy.com → godaddy.com → com
+	parts := strings.Split(d, ".")
+	for i := 1; i < len(parts)-1; i++ {
+		parent := strings.Join(parts[i:], ".")
+		if snap.Bloom != nil && !snap.Bloom.TestString(parent) {
+			continue
+		}
+		if pols, ok := snap.Exact[parent]; ok && len(pols) > 0 {
+			best := pickHighestPriority(pols)
+			return policyDecision(best), nil
+		}
+	}
+
 	return Decision{Action: ActionAllow}, nil
 }
 

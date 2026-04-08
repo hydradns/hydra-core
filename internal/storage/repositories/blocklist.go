@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/lopster568/phantomDNS/internal/logger"
 	"github.com/lopster568/phantomDNS/internal/storage/models"
 	"gorm.io/gorm"
 )
@@ -33,12 +32,19 @@ func NewBlocklistRepo(db *gorm.DB) *BlocklistRepo {
 }
 
 func (r *BlocklistRepo) IsBlocked(domain string) (bool, error) {
-	logger.Log.Infof("Checking if domain %s is blocklisted", domain)
-	var count int64
 	// Normalize domain (lowercase, remove trailing dot)
 	d := strings.TrimSuffix(strings.ToLower(domain), ".")
+
+	// Check exact match + parent domains (www.ads.google.com → ads.google.com → google.com)
+	parts := strings.Split(d, ".")
+	candidates := make([]string, 0, len(parts)-1)
+	for i := 0; i < len(parts)-1; i++ {
+		candidates = append(candidates, strings.Join(parts[i:], "."))
+	}
+
+	var count int64
 	err := r.db.Model(&models.BlocklistEntry{}).
-		Where("domain = ?", d).
+		Where("domain IN ?", candidates).
 		Count(&count).Error
 	if err != nil {
 		return false, err
