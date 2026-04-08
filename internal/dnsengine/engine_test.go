@@ -73,6 +73,26 @@ func isBlockedResponse(m *dns.Msg) bool {
 
 // --- Tests ---
 
+func TestStripSearchDomain(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"godaddy.com.hgu_lan", "godaddy.com"},
+		{"facebook.com.local", "facebook.com"},
+		{"ads.google.com.domain.name", "ads.google.com"},
+		{"github.com", "github.com"},
+		{"example.com.lan", "example.com"},
+		{"a.b.c.com.home", "a.b.c.com"},
+		{"short.io", "short.io"},
+	}
+	for _, tt := range tests {
+		if got := stripSearchDomain(tt.input); got != tt.want {
+			t.Errorf("stripSearchDomain(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
 func TestNormalizeDomain(t *testing.T) {
 	tests := []struct {
 		input string

@@ -138,6 +138,40 @@ func normalizeDomain(d string) string {
 	return strings.TrimSuffix(strings.ToLower(d), ".")
 }
 
+// Known private/local DNS suffixes appended by routers via DHCP search domains.
+// When a router advertises a search domain (e.g., "hgu_lan", "home", "local"),
+// Windows/macOS append it to bare hostnames AND sometimes to FQDNs.
+// We strip these before blocklist/policy checks so "godaddy.com.hgu_lan"
+// still matches the "godaddy.com" block rule.
+var localSuffixes = map[string]bool{
+	"lan": true, "local": true, "home": true, "internal": true,
+	"localdomain": true, "domain.name": true, "hgu_lan": true,
+	"fritz.box": true, "mynetwork": true, "belkin": true,
+	"router": true, "gateway": true, "dlink": true,
+}
+
+// stripSearchDomain removes known router-appended search domains from a query.
+// e.g., "godaddy.com.hgu_lan" → "godaddy.com"
+func stripSearchDomain(domain string) string {
+	parts := strings.Split(domain, ".")
+	if len(parts) < 3 {
+		return domain
+	}
+
+	// Check last 1 and last 2 labels against known suffixes
+	lastOne := parts[len(parts)-1]
+	lastTwo := strings.Join(parts[len(parts)-2:], ".")
+
+	if localSuffixes[lastTwo] {
+		return strings.Join(parts[:len(parts)-2], ".")
+	}
+	if localSuffixes[lastOne] {
+		return strings.Join(parts[:len(parts)-1], ".")
+	}
+
+	return domain
+}
+
 // ProcessDNSQuery processes the DNS query and returns a response
 func (e *Engine) ProcessDNSQuery(w dns.ResponseWriter, r *dns.Msg) {
 	if r == nil || len(r.Question) == 0 {
@@ -159,7 +193,7 @@ func (e *Engine) ProcessDNSQuery(w dns.ResponseWriter, r *dns.Msg) {
 		e.metrics.Record(elapsed, success)
 	}()
 
-	domainName := normalizeDomain(r.Question[0].Name)
+	domainName := stripSearchDomain(normalizeDomain(r.Question[0].Name))
 	clientIP := ""
 	if w.RemoteAddr() != nil {
 		clientIP = w.RemoteAddr().String()
