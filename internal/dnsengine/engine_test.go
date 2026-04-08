@@ -58,6 +58,19 @@ func newTestEngine(bl *mockBlocklist, policies []policy.Policy) *Engine {
 	return e
 }
 
+// isBlockedResponse checks if a DNS response is a block (0.0.0.0 A record)
+func isBlockedResponse(m *dns.Msg) bool {
+	if m == nil {
+		return false
+	}
+	for _, rr := range m.Answer {
+		if a, ok := rr.(*dns.A); ok && a.A.String() == "0.0.0.0" {
+			return true
+		}
+	}
+	return false
+}
+
 // --- Tests ---
 
 func TestNormalizeDomain(t *testing.T) {
@@ -88,7 +101,7 @@ func TestProcessDNSQuery_DrainMode(t *testing.T) {
 		t.Fatal("expected REFUSED response in drain mode, got nil")
 	}
 	if w.msg.Rcode != dns.RcodeRefused {
-		t.Errorf("expected REFUSED rcode, got %d", w.msg.Rcode)
+		t.Errorf("expected REFUSED rcode in drain mode, got %d", w.msg.Rcode)
 	}
 }
 
@@ -123,8 +136,8 @@ func TestProcessDNSQuery_BlockedByBlocklist(t *testing.T) {
 	if w.msg == nil {
 		t.Fatal("expected response for blocklisted domain")
 	}
-	if w.msg.Rcode != dns.RcodeRefused {
-		t.Errorf("expected REFUSED for blocklisted domain, got %d", w.msg.Rcode)
+	if !isBlockedResponse(w.msg) {
+		t.Errorf("expected blocked (0.0.0.0) for blocklisted domain, got %d", w.msg.Rcode)
 	}
 }
 
@@ -140,8 +153,8 @@ func TestProcessDNSQuery_BlockedByPolicy(t *testing.T) {
 	if w.msg == nil {
 		t.Fatal("expected response for policy-blocked domain")
 	}
-	if w.msg.Rcode != dns.RcodeRefused {
-		t.Errorf("expected REFUSED for policy-blocked domain, got %d", w.msg.Rcode)
+	if !isBlockedResponse(w.msg) {
+		t.Errorf("expected blocked (0.0.0.0) for policy-blocked domain, got %d", w.msg.Rcode)
 	}
 }
 
@@ -159,8 +172,8 @@ func TestProcessDNSQuery_BlocklistBeforePolicy(t *testing.T) {
 	if w.msg == nil {
 		t.Fatal("expected response")
 	}
-	if w.msg.Rcode != dns.RcodeRefused {
-		t.Errorf("expected REFUSED (blocklist takes precedence), got %d", w.msg.Rcode)
+	if !isBlockedResponse(w.msg) {
+		t.Errorf("expected blocked (0.0.0.0) (blocklist takes precedence), got %d", w.msg.Rcode)
 	}
 }
 
@@ -177,8 +190,8 @@ func TestProcessDNSQuery_DomainNormalization(t *testing.T) {
 	if w.msg == nil {
 		t.Fatal("expected response for normalized domain match")
 	}
-	if w.msg.Rcode != dns.RcodeRefused {
-		t.Errorf("expected REFUSED after normalization, got %d", w.msg.Rcode)
+	if !isBlockedResponse(w.msg) {
+		t.Errorf("expected blocked (0.0.0.0) after normalization, got %d", w.msg.Rcode)
 	}
 }
 
@@ -196,7 +209,7 @@ func TestProcessDNSQuery_BlocklistErrorContinues(t *testing.T) {
 	if w.msg == nil {
 		t.Fatal("expected response even when blocklist errors")
 	}
-	if w.msg.Rcode != dns.RcodeRefused {
+	if !isBlockedResponse(w.msg) {
 		t.Errorf("expected policy to block after blocklist error, got rcode %d", w.msg.Rcode)
 	}
 }
@@ -226,8 +239,8 @@ func TestRespondBlocked(t *testing.T) {
 	if w.msg == nil {
 		t.Fatal("expected response from respondBlocked")
 	}
-	if w.msg.Rcode != dns.RcodeRefused {
-		t.Errorf("expected REFUSED, got %d", w.msg.Rcode)
+	if !isBlockedResponse(w.msg) {
+		t.Error("expected blocked response (0.0.0.0 A record)")
 	}
 }
 

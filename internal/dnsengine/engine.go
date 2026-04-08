@@ -74,7 +74,13 @@ func (e *Engine) Shutdown() {
 
 func (e *Engine) respondBlocked(w dns.ResponseWriter, r *dns.Msg, domain, reason string) {
 	m := new(dns.Msg)
-	m.SetRcode(r, dns.RcodeRefused)
+	m.SetReply(r)
+	// Return 0.0.0.0 instead of REFUSED — browsers treat REFUSED as "try another DNS"
+	// but 0.0.0.0 causes an immediate connection failure (ERR_CONNECTION_REFUSED)
+	rr, err := dns.NewRR(r.Question[0].Name + " 60 IN A 0.0.0.0")
+	if err == nil {
+		m.Answer = append(m.Answer, rr)
+	}
 	if err := w.WriteMsg(m); err != nil {
 		logger.Log.Error("Failed to write DNS block response: " + err.Error())
 	}
